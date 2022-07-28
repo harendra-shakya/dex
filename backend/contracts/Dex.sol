@@ -54,6 +54,21 @@ contract Dex {
         s_allPairs.push(pairTokens);
     }
 
+    // function _swap( // it's useless, just here for ref
+    //     address _token1,
+    //     uint256 _amount1,
+    //     address _token2,
+    //     uint256 _amount2
+    // ) external {
+
+    //     require(s_pairTokens[_token1][_token2] != address(0), "Pair not available");
+
+        /// do this on frontend
+        // 1. find pool address (addr = s_pairTokens[_token1][_token2]);
+        // 2. use that pool to swap
+
+    // }
+
     function getLatestPrice(address _token) public view returns (int256) {
         AggregatorV3Interface priceFeed = s_priceFeeds[_token];
 

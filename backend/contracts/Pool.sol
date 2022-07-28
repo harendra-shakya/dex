@@ -22,7 +22,7 @@ contract Pool is ReentrancyGuard {
 
     // tokenAddress & user => his liquidity added
     mapping(address => mapping(address => uint256)) s_liquidity;
-    mapping(address => uint256) s_TotalLiquidity;
+    mapping(address => uint256) s_totalLiquidity;
 
     ///////////////////////
     ////   Events   ///////
@@ -40,6 +40,22 @@ contract Pool is ReentrancyGuard {
         address _token2,
         uint256 indexed _amount2
     );
+
+    modifier isPairedToken(
+        address _token1,
+        address _token2
+    ) {
+        bool allowed1;
+        bool allowed2;
+
+        for (uint256 i = 0; i > s_pairTokens.length; i++) {
+            if (_token1 == s_pairTokens[i]) allowed1 = true;
+            if (_token2 == s_pairTokens[i]) allowed2 = true;
+        }
+
+        require(allowed1 && allowed2, "Not a pair token");
+        _;
+    }
 
     modifier isAllowed(
         address _token1,
@@ -114,6 +130,36 @@ contract Pool is ReentrancyGuard {
         emit LiquidityRemoved(_token1, _amount1, _token2, _amount2);
     }
 
+    mapping(address => uint256) s_fees;
+
+    function swap(
+        address _tokenIn,
+        uint256 _amountIn,
+        address _tokenOut
+    )   external 
+        nonReentrant
+    {   
+        require(_tokenIn != _tokenOut, "Same token not allowed");
+        uint256 _amountOut = getAmount(_tokenIn, _amountIn, _tokenOut);
+
+        _safeTranferFrom(_tokenIn, msg.sender, address(this), _amountIn);
+        _safeTranfer(_tokenOut, msg.sender, _amountOut);
+
+        s_totalLiquidity[_tokenIn] += _amountIn;
+        s_liquidity[_tokenIn][msg.sender] += _amountIn;
+
+        s_totalLiquidity[_tokenOut] -= _amountOut;
+        s_liquidity[_tokenOut][msg.sender] -= _amountOut;
+    }
+
+    function getAmount(
+        address _tokenIn,
+        uint256 _amountIn,
+        address _tokenOut
+    ) public view returns (uint256) {
+        return (s_totalLiquidity[_tokenIn] * _amountIn) / s_totalLiquidity[_tokenOut];
+    }
+
     /////////////////////////////
     ////// Helper functions /////
     ////////////////////////////
@@ -152,8 +198,8 @@ contract Pool is ReentrancyGuard {
 
         s_liquidity[_token1][msg.sender] += _amount1;
         s_liquidity[_token2][msg.sender] += _amount2;
-        s_TotalLiquidity[_token1] += _amount1;
-        s_TotalLiquidity[_token2] += _amount2;
+        s_totalLiquidity[_token1] += _amount1;
+        s_totalLiquidity[_token2] += _amount2;
     }
 
     function _removeLiquidity(
@@ -164,8 +210,8 @@ contract Pool is ReentrancyGuard {
     ) private {
         s_liquidity[_token1][msg.sender] -= _amount1;
         s_liquidity[_token2][msg.sender] -= _amount2;
-        s_TotalLiquidity[_token1] -= _amount1;
-        s_TotalLiquidity[_token2] -= _amount2;
+        s_totalLiquidity[_token1] -= _amount1;
+        s_totalLiquidity[_token2] -= _amount2;
 
         _safeTranfer(_token1, msg.sender, _amount1);
         _safeTranfer(_token2, msg.sender, _amount2);
