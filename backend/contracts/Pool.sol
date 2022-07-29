@@ -34,6 +34,7 @@ contract Pool is ReentrancyGuard {
         address _token2,
         uint256 indexed _amount2
     );
+
     event LiquidityRemoved(
         address indexed _token1,
         uint256 indexed _amount1,
@@ -41,10 +42,7 @@ contract Pool is ReentrancyGuard {
         uint256 indexed _amount2
     );
 
-    modifier isPairedToken(
-        address _token1,
-        address _token2
-    ) {
+    modifier isPairedToken(address _token1, address _token2) {
         bool allowed1;
         bool allowed2;
 
@@ -53,36 +51,30 @@ contract Pool is ReentrancyGuard {
             if (_token2 == s_pairTokens[i]) allowed2 = true;
         }
 
-        require(allowed1 && allowed2, "Not a pair token");
+        require(allowed1, "Not a pair token");
         _;
     }
 
-    modifier isAllowed(
+    modifier isTokenAllowed(
         address _token1,
         uint256 _amount1,
         address _token2,
         uint256 _amount2
     ) {
         require(_token1 != _token2, "Same token not allowed");
+        require(_amount1 > 0 && _amount2 > 0, "Zero amount not allowed");
 
-        bool allowed1;
-        bool allowed2;
+        (uint256 price1, uint256 decimals1) = getLatestPrice(_token1);
+        (uint256 price2, uint256 decimals2) = getLatestPrice(_token2);
 
-        for (uint256 i = 0; i > s_pairTokens.length; i++) {
-            if (_token1 == s_pairTokens[i]) allowed1 = true;
-            if (_token2 == s_pairTokens[i]) allowed2 = true;
-        }
-
-        require(allowed1 && allowed2, "Not a pair token");
-
-        uint256 token1InUsd = uint256(getLatestPrice(_token1)) * _amount1;
-        uint256 token2InUsd = uint256(getLatestPrice(_token2)) * _amount2;
+        uint256 token1InUsd = (price1 / decimals1) * _amount1;
+        uint256 token2InUsd = (price2 / decimals2) * _amount2;
         require(token1InUsd == token2InUsd, "Amount in USD should be matched");
         _;
     }
 
-    /////////////////////////
-    ///// Main functions ////
+    //////////////////////////
+    ///// Main functions /////
     /////////////////////////
 
     constructor(
@@ -101,13 +93,39 @@ contract Pool is ReentrancyGuard {
         uint256 _amount1,
         address _token2,
         uint256 _amount2
-    )
-        external
-        isAllowed(_token1, _amount1, _token2, _amount2)
-        nonReentrant
-    {
-        _addLiquidity(_token1, _amount1, _token2, _amount2);
+    ) external isPairedToken(_token1, _token2) nonReentrant {
+        isAmountEqual(_token1, _amount1, _token2, _amount2);
+
+        _safeTranferFrom(_token1, msg.sender, _amount1);
+        _safeTranferFrom(_token2, msg.sender, _amount2);
+
+        s_liquidity[_token1][msg.sender] += _amount1;
+        s_liquidity[_token2][msg.sender] += _amount2;
+        s_totalLiquidity[_token1] += _amount1;
+        s_totalLiquidity[_token2] += _amount2;
+
         emit LiquidityAdded(_token1, _amount1, _token2, _amount2);
+    }
+
+    function isAmountEqual(
+        address _token1,
+        uint256 _amount1,
+        address _token2,
+        uint256 _amount2
+    ) private view {
+        require(_token1 != _token2, "Same token not allowed");
+        require(_amount1 > 0 && _amount2 > 0, "Zero amount not allowed");
+
+        (uint256 price1, uint256 decimals1) = getLatestPrice(_token1);
+        (uint256 price2, uint256 decimals2) = getLatestPrice(_token2);
+
+        uint256 token1InUsd = (price1 / decimals1) * _amount1;
+        uint256 token2InUsd = (price2 / decimals2) * _amount2;
+        require(
+            token1InUsd > (token2InUsd - (token2InUsd / 100)) &&
+                token1InUsd < (token2InUsd + (token2InUsd / 100)),
+            "Amount in USD should be matched"
+        );
     }
 
     function removeLiquidity(
@@ -115,17 +133,8 @@ contract Pool is ReentrancyGuard {
         uint256 _amount1,
         address _token2,
         uint256 _amount2
-    )
-        external
-        isAllowed(_token1, _amount1, _token2, _amount2)
-        nonReentrant
-    {
-        require(
-            s_liquidity[_token1][msg.sender] >= _amount1 &&
-                s_liquidity[_token2][msg.sender] >= _amount2,
-            "Not enough liquidity"
-        );
-
+    ) external isPairedToken(_token1, _token2) nonReentrant {
+        isAmountEqual(_token1, _amount1, _token2, _amount2);
         _removeLiquidity(_token1, _amount1, _token2, _amount2);
         emit LiquidityRemoved(_token1, _amount1, _token2, _amount2);
     }
@@ -136,13 +145,11 @@ contract Pool is ReentrancyGuard {
         address _tokenIn,
         uint256 _amountIn,
         address _tokenOut
-    )   external 
-        nonReentrant
-    {   
+    ) external isPairedToken(_tokenIn, _tokenOut) nonReentrant {
         require(_tokenIn != _tokenOut, "Same token not allowed");
         uint256 _amountOut = getAmount(_tokenIn, _amountIn, _tokenOut);
 
-        _safeTranferFrom(_tokenIn, msg.sender, address(this), _amountIn);
+        _safeTranferFrom(_tokenIn, msg.sender, _amountIn);
         _safeTranfer(_tokenOut, msg.sender, _amountOut);
 
         s_totalLiquidity[_tokenIn] += _amountIn;
@@ -157,7 +164,14 @@ contract Pool is ReentrancyGuard {
         uint256 _amountIn,
         address _tokenOut
     ) public view returns (uint256) {
-        return (s_totalLiquidity[_tokenIn] * _amountIn) / s_totalLiquidity[_tokenOut];
+        (uint256 inPrice, uint256 inDecimals) = getLatestPrice(_tokenIn);
+        uint256 totalInLiquidity = (inPrice / 10**inDecimals) * s_totalLiquidity[_tokenIn];
+
+        (uint256 outPrice, uint256 outDecimals) = getLatestPrice(_tokenOut);
+        uint256 totalOutLiquidity = (outPrice / 10**outDecimals) * s_totalLiquidity[_tokenOut];
+
+        return ((totalOutLiquidity * _amountIn * inPrice) / 10**inDecimals) / totalInLiquidity;
+        // return totalOutLiquidity;
     }
 
     /////////////////////////////
@@ -178,29 +192,29 @@ contract Pool is ReentrancyGuard {
     function _safeTranferFrom(
         address token,
         address from,
-        address to,
         uint256 amount
     ) private {
         (bool success, bytes memory data) = token.call(
-            abi.encodeWithSelector(TF_SELECTOR, from, to, amount)
+            abi.encodeWithSelector(TF_SELECTOR, from, address(this), amount)
         );
         require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer Failed!");
     }
 
-    function _addLiquidity(
-        address _token1,
-        uint256 _amount1,
-        address _token2,
-        uint256 _amount2
-    ) private {
-        _safeTranferFrom(_token1, msg.sender, address(this), _amount1);
-        _safeTranferFrom(_token2, msg.sender, address(this), _amount2);
+    // function _addLiquidity(
+    //     address _token1,
+    //     uint256 _amount1,
+    //     address _token2,
+    //     uint256 _amount2
+    // ) private {
+    //     _safeTranferFrom(_token1, msg.sender, address(this), _amount1);
+    //     IERC20(_token1).transferFrom(msg.sender, to, amount);
+    //     // _safeTranferFrom(_token2, msg.sender, address(this), _amount2);
 
-        s_liquidity[_token1][msg.sender] += _amount1;
-        s_liquidity[_token2][msg.sender] += _amount2;
-        s_totalLiquidity[_token1] += _amount1;
-        s_totalLiquidity[_token2] += _amount2;
-    }
+    //     s_liquidity[_token1][msg.sender] += _amount1;
+    //     s_liquidity[_token2][msg.sender] += _amount2;
+    //     s_totalLiquidity[_token1] += _amount1;
+    //     s_totalLiquidity[_token2] += _amount2;
+    // }
 
     function _removeLiquidity(
         address _token1,
@@ -208,6 +222,12 @@ contract Pool is ReentrancyGuard {
         address _token2,
         uint256 _amount2
     ) private {
+        require(
+            s_liquidity[_token1][msg.sender] >= _amount1 &&
+                s_liquidity[_token2][msg.sender] >= _amount2,
+            "Not enough liquidity"
+        );
+
         s_liquidity[_token1][msg.sender] -= _amount1;
         s_liquidity[_token2][msg.sender] -= _amount2;
         s_totalLiquidity[_token1] -= _amount1;
@@ -217,10 +237,9 @@ contract Pool is ReentrancyGuard {
         _safeTranfer(_token2, msg.sender, _amount2);
     }
 
-    function getLatestPrice(address _token) public view returns (int256) {
-        AggregatorV3Interface priceFeed = s_priceFeeds[_token];
-
-        (, int256 price, , , ) = priceFeed.latestRoundData();
-        return price;
+    function getLatestPrice(address _token) public view returns (uint256, uint256) {
+        (, int256 price, , , ) = s_priceFeeds[_token].latestRoundData();
+        uint256 decimals = uint256(s_priceFeeds[_token].decimals());
+        return (uint256(price), decimals);
     }
 }
