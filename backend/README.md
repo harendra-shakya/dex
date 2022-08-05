@@ -8,14 +8,14 @@
 
 ### Contract 3 (Pool)
 
-- **Swap**
+- Swap
 
 Calculate amountOut ----------> take token from trader --------> loop path array ---------> Swap token
 
-- **Add Liquidity**
+- Add Liquidity
 
 Take tokens from liquidity provider --------> calculate tokens to be minted ---------> mint liquidity tokens
 
-- **Remove liquidity**
+- Remove liquidity
 
 Transfer liquidity token from provider -------> Calculate tokens to be burnt ---------> burnt liquidity tokens ------> send back his assests
