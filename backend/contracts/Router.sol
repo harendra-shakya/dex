@@ -17,7 +17,6 @@ contract Router is ReentrancyGuard {
         bytes4(keccak256(bytes("transferFrom(address,address,uint256)")));
 
     mapping(address => AggregatorV3Interface) s_priceFeeds;
-
     mapping(address => mapping(address => uint256)) s_liquidity;
     mapping(address => uint256) s_totalLiquidity;
 
@@ -26,36 +25,13 @@ contract Router is ReentrancyGuard {
     //////////////////////
 
     event LiquidityAdded(
-        address indexed _token1,
-        uint256 indexed _amount1,
-        address _token2,
-        uint256 indexed _amount2
+        address indexed token1,
+        uint256 indexed amount1,
+        address token2,
+        uint256 indexed amount2
     );
 
-    event LiquidityRemoved(
-        address indexed _token1,
-        uint256 indexed _amount1,
-        address _token2,
-        uint256 indexed _amount2
-    );
-
-    // modifier isTokenAllowed(
-    //     address _token1,
-    //     uint256 _amount1,
-    //     address _token2,
-    //     uint256 _amount2
-    // ) {
-    //     require(_token1 != _token2, "Same token not allowed");
-    //     require(_amount1 > 0 && _amount2 > 0, "Zero amount not allowed");
-
-    //     (uint256 price1, uint256 decimals1) = getLatestPrice(_token1);
-    //     (uint256 price2, uint256 decimals2) = getLatestPrice(_token2);
-
-    //     uint256 token1InUsd = (price1 / decimals1) * _amount1;
-    //     uint256 token2InUsd = (price2 / decimals2) * _amount2;
-    //     require(token1InUsd == token2InUsd, "Amount in USD should be matched");
-    //     _;
-    // }
+    event LiquidityRemoved(address indexed token1, address token2, uint256 indexed amount);
 
     //////////////////////////
     ///// Main functions /////
@@ -65,26 +41,6 @@ contract Router is ReentrancyGuard {
 
     constructor(address _factory) {
         factory = _factory;
-    }
-
-    // *** Add Liquidity ***
-    function addLiquidity(
-        address _token1,
-        uint256 _amount1,
-        address _token2,
-        uint256 _amount2
-    ) external nonReentrant {
-        isAmountEqual(_token1, _amount1, _token2, _amount2);
-
-        HelperLibrary._safeTranferFrom(_token1, msg.sender, address(this), _amount1);
-        HelperLibrary._safeTranferFrom(_token2, msg.sender, address(this), _amount2);
-
-        s_liquidity[_token1][msg.sender] += _amount1;
-        s_liquidity[_token2][msg.sender] += _amount2;
-        s_totalLiquidity[_token1] += _amount1;
-        s_totalLiquidity[_token2] += _amount2;
-
-        emit LiquidityAdded(_token1, _amount1, _token2, _amount2);
     }
 
     function isAmountEqual(
@@ -101,11 +57,24 @@ contract Router is ReentrancyGuard {
 
         uint256 token1InUsd = (price1 / decimals1) * _amount1;
         uint256 token2InUsd = (price2 / decimals2) * _amount2;
-        require(
-            token1InUsd > (token2InUsd - (token2InUsd / 100)) &&
-                token1InUsd < (token2InUsd + (token2InUsd / 100)),
-            "Amount in USD should be matched"
-        );
+        require(token1InUsd == token2InUsd, "Amount in USD should be matched");
+    }
+
+    // *** Add Liquidity ***
+    function addLiquidity(
+        address _token1,
+        uint256 _amount1,
+        address _token2,
+        uint256 _amount2
+    ) external nonReentrant {
+        isAmountEqual(_token1, _amount1, _token2, _amount2);
+        address _pool = Factory(factory).getPoolAddress(_token1, _token2);
+        HelperLibrary._safeTranferFrom(_token1, msg.sender, _pool, _amount1);
+        HelperLibrary._safeTranferFrom(_token2, msg.sender, _pool, _amount2);
+
+        Pool(_pool).mint(msg.sender);
+
+        emit LiquidityAdded(_token1, _amount1, _token2, _amount2);
     }
 
     // *** Remove Liquidity ***
@@ -114,20 +83,22 @@ contract Router is ReentrancyGuard {
         address _token1,
         address _token2
     ) external nonReentrant {
+        require(_amount > 0, "Amount is equal to zero");
+        require(_token1 != _token2, "Same token not allowed");
         address _pool = Factory(factory).getPoolAddress(_token1, _token2);
         HelperLibrary._safeTranferFrom(_pool, msg.sender, _pool, _amount);
         // emit LiquidityRemoved(_token1, _amount1, _token2, _amount2);
-        Pool(_pool).burn(_amount, msg.sender);
+        Pool(_pool).burn(msg.sender);
+        emit LiquidityRemoved(_token1, _token2, _amount);
     }
 
     // *** Swap *** //
     function _swap(
-        address _tokenIn,
         uint256 _amountIn,
         address[] memory _path, // path[0] -> tokenIn // path[last] -> tokenOut
         address _to
     ) external nonReentrant {
-        HelperLibrary._safeTranferFrom(_tokenIn, msg.sender, address(this), _amountIn);
+        HelperLibrary._safeTranferFrom(_path[0], msg.sender, address(this), _amountIn);
         for (uint256 i = 0; i < _path.length; i++) {
             address _pool = Factory(factory).getPoolAddress(_path[i], _path[i + 1]);
             uint256 _amountOut1 = Pool(_pool).getAmountOut(_path[i], _amountIn, _path[i + 1]);
@@ -141,10 +112,6 @@ contract Router is ReentrancyGuard {
             Pool(_pool).swap(amountOut1, amountOut2, to);
         }
     }
-
-    /////////////////////////////
-    ////// Helper functions /////
-    ////////////////////////////
 
     function getLatestPrice(address _token) public view returns (uint256, uint256) {
         (, int256 price, , , ) = s_priceFeeds[_token].latestRoundData();

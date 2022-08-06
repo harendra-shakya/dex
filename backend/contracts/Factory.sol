@@ -21,10 +21,8 @@ contract Factory {
 
     function createPool(
         address _token1,
-        uint256 _amount1,
         address _token2,
-        uint256 _amount2,
-        uint256 _fee
+        uint8 _fee
     ) external {
         require(_token1 != _token2, "Same token not allowed");
         require(s_pairTokens[_token1][_token2] == address(0), "Pair already exist");
@@ -35,9 +33,7 @@ contract Factory {
             s_priceFeeds[_token2]
         ];
 
-        Pool _pool = new Pool(pairTokens, priceFeeds);
-        // _pool.addLiquidity(_token1, _amount1, _token2, _amount2);
-
+        Pool _pool = new Pool(pairTokens, priceFeeds, _fee);
         s_pairTokens[_token1][_token2] = address(_pool);
         s_pairTokens[_token2][_token1] = address(_pool);
         s_allPairs.push(pairTokens);
