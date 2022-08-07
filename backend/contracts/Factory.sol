@@ -12,7 +12,7 @@ contract Factory {
     mapping(address => AggregatorV3Interface) s_priceFeeds;
 
     // token1 & token2 -> pool address
-    mapping(address => mapping(address => address)) s_pairTokens;
+    mapping(address => mapping(address => mapping(uint8 => address))) s_pairTokens;
 
     constructor(address[] memory _allowedTokens, address[] memory _priceFeeds) {
         s_allowedTokens = _allowedTokens;
@@ -27,22 +27,22 @@ contract Factory {
         uint8 _fee
     ) external {
         require(_token1 != _token2, "Same token not allowed");
-        require(s_pairTokens[_token1][_token2] == address(0), "Pair already exist");
+        require(_fee <= 100, "Invalid fee amount");
+        require(s_pairTokens[_token1][_token2][_fee] == address(0), "Pair already exist");
 
         address[2] memory pairTokens = [_token1, _token2];
         Pool _pool = new Pool(pairTokens, _fee);
-        s_pairTokens[_token1][_token2] = address(_pool);
-        s_pairTokens[_token2][_token1] = address(_pool);
+        s_pairTokens[_token1][_token2][_fee] = address(_pool);
+        s_pairTokens[_token2][_token1][_fee] = address(_pool);
         s_allPairs.push(pairTokens);
     }
 
-    function getPoolAddress(address _token1, address _token2) external view returns (address) {
-        return s_pairTokens[_token1][_token2];
+    function getPoolAddress(
+        address _token1,
+        address _token2,
+        uint8 _fee
+    ) external view returns (address) {
+        return s_pairTokens[_token1][_token2][_fee];
     }
 
-    function getLatestPrice(address _token) public view returns (uint256, uint256) {
-        (, int256 price, , , ) = s_priceFeeds[_token].latestRoundData();
-        uint256 decimals = uint256(s_priceFeeds[_token].decimals());
-        return (uint256(price), decimals);
-    }
 }

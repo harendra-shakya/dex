@@ -9,7 +9,6 @@ interface IFactory {
         uint8 _fee
     ) external;
 
-    function getPoolAddress(address _token1, address _token2) external view returns (address);
+    function getPoolAddress(address _token1, address _token2, uint8 _fee) external view returns (address);
 
-    function getLatestPrice(address _token) external view returns (uint256, uint256);
 }

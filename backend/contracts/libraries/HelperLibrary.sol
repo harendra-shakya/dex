@@ -16,7 +16,7 @@ library HelperLibrary {
         address token,
         address to,
         uint256 amount
-    ) public {
+    ) internal {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(T_SELECTOR, to, amount)
         );
@@ -28,7 +28,7 @@ library HelperLibrary {
         address from,
         address to,
         uint256 amount
-    ) public {
+    ) internal {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(TF_SELECTOR, from, to, amount)
         );
@@ -46,5 +46,11 @@ library HelperLibrary {
         } else if (y != 0) {
             z = 1;
         }
+    }
+
+    function getEqualAmount( uint256 amount1, uint256 reserve1, uint256 reserve2) internal pure returns (uint256 amount2) {
+        require(amount1 > 0, 'ROUTER: INSUFFICIENT_AMOUNT');
+        require(reserve1 > 0 && reserve2 > 0, 'ROUTER: INSUFFICIENT_LIQUIDITY');
+        amount2 = (amount1 * reserve2) / reserve1;
     }
 }
