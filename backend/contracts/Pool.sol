@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./libraries/HelperLibrary.sol";
 import "./LiquidityToken.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 pragma solidity ^0.8.7;
 
@@ -65,7 +66,7 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         uint256 amount2 = balance2 - _reserve2;
 
         if (_totalSupply == 0) {
-            liquidity = HelperLibrary.sqrt(amount1 * amount2).sub(MINIMUM_LIQUIDITY);
+            liquidity = Math.sqrt(amount1 * amount2).sub(MINIMUM_LIQUIDITY);
             _mint(address(0), MINIMUM_LIQUIDITY);
         } else {
             liquidity =

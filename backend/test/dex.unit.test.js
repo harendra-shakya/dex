@@ -3,8 +3,8 @@ const { ethers } = require("hardhat");
 const { networkConfig } = require("../helper-hardhat-config");
 
 describe("smart contract tests", function () {
-    const amount1 = ethers.utils.parseEther("100");
-    const amount2 = ethers.utils.parseEther("165400");
+    const amount1 = ethers.utils.parseEther("1000");
+    const amount2 = ethers.utils.parseEther("1654000");
     let factory,
         wethToken,
         user,
@@ -52,44 +52,51 @@ describe("smart contract tests", function () {
     });
 
     describe("dex unit test", function () {
+        const smallAmount1 = ethers.utils.parseEther("10");
+        const smallAmount2 = ethers.utils.parseEther("16540");
+        let pool;
         beforeEach(async function () {
-            await wethToken.approve(router.address, ethers.utils.parseEther("1000000000000000"));
-            await daiToken.approve(router.address, ethers.utils.parseEther("1000000000000000000"));
-            await router.addLiquidity(
+            await wethToken.approve(router.address, ethers.utils.parseEther("10000000000000"));
+            await daiToken.approve(router.address, ethers.utils.parseEther("10000000000000"));
+            await router.addLiquidity(wethTokenAddress, daiTokenAddress, amount1, amount2, 30);
+            const poolAddress = await factory.getPoolAddress(
                 wethTokenAddress,
                 daiTokenAddress,
-                amount1, // amount that liquidity provider want to add
-                amount2,
-                10, // min amount
-                10, // i think use it on slipage
                 30
             );
+            pool = await ethers.getContractAt("Pool", poolAddress);
         });
-        describe("add liquidity", function () {});
-        describe("swap", function () {
-            it("calculates tokens to be sent", async function () {
-                const poolAddress = await factory.getPoolAddress(
+        describe("add liquidity", function () {
+            it("optimizes amount automatically", async function () {
+                const beforeWethBal = await wethToken.balanceOf(pool.address);
+                await router.addLiquidity(
                     wethTokenAddress,
                     daiTokenAddress,
+                    smallAmount1.add(smallAmount1), // doubling
+                    smallAmount2,
                     30
                 );
-                const pool = await ethers.getContractAt("Pool", poolAddress);
-                // const r1 = await pool.getReserves();
-                // console.log(r1._reserve1);
-                // console.log(ethers.utils.formatEther(r1._reserve2));
-                // const p1 = await pool.getLatestPrice(wethTokenAddress);
-                // const p2 = await pool.getLatestPrice(daiTokenAddress);
-                // // await pool.addLiquidity(wethTokenAddress, amount1, daiTokenAddress, amount2);
-                // console.log("weth price", ethers.utils.formatUnits(parseInt(p1.toString()), "8"));
-                // console.log("dai price", ethers.utils.formatUnits(parseInt(p2.toString()), "8"));
-                let amt = await pool.getAmountOut(
+                const afterWethBal = await wethToken.balanceOf(pool.address);
+                await expect(afterWethBal).to.equal(smallAmount1.add(beforeWethBal));
+
+                const beforeDaiBal = await daiToken.balanceOf(pool.address);
+                await router.addLiquidity(
+                    wethTokenAddress,
                     daiTokenAddress,
-                    ethers.utils.parseEther("1681.52085106")
+                    smallAmount1,
+                    smallAmount2.add(smallAmount2), // doubling
+                    30
                 );
-                // console.log("amountOut", ethers.utils.formatEther(amt.amountOut));
-                // console.log("amountOut", ethers.utils.formatEther(amt._reserveIn));
-                // console.log("amountOut", ethers.utils.formatEther(amt._reserveOut));
+                const afterDaiBal = await daiToken.balanceOf(pool.address);
+                await expect(afterDaiBal).to.equal(beforeDaiBal.add(smallAmount2));
             });
+            it("sends liquidity tokens to provider", async function () {
+                const bal = await pool.balanceOf(user.address);
+                assert(bal > 0);
+            });
+        });
+        describe("remove liquidity", function () {
+            it("");
         });
     });
 });

@@ -28,34 +28,33 @@ contract Router is ReentrancyGuard {
     function _addLiquidity(
         address _token1,
         address _token2,
-        uint256 _amount1Desired, // amount that liquidity provider want to add
-        uint256 _amount2Desired,
-        uint256 _amount1Min, // min amount
-        uint256 _amount2Min, // i think use it on slipage
+        uint256 _amount1, // amount that liquidity provider want to add
+        uint256 _amount2,
         uint8 _fee
     ) private returns (uint256 amount1, uint256 amount2) {
         require(_fee <= 100, "ROUTER: Invalid fee amount"); // fee not more than 1%
         require(_token1 != _token2, "ROUTER: Same token not allowed");
-        require(_amount1Desired > 0 && _amount2Desired > 0, "ROUTER: Zero amount not allowed");
+        require(_amount1 > 0 && _amount2 > 0, "ROUTER: INVALID_AMOUNT");
+
         address pool = IFactory(factory).getPoolAddress(_token1, _token2, _fee);
-        if (pool == address(0)) IFactory(factory).createPool(_token1, _token2, _fee);
-        pool = IFactory(factory).getPoolAddress(_token1, _token2, _fee);
+        if (pool == address(0)) {
+            IFactory(factory).createPool(_token1, _token2, _fee);
+            pool = IFactory(factory).getPoolAddress(_token1, _token2, _fee);
+        }
 
         (uint256 reserve1, uint256 reserve2,) = IPool(pool).getReserves();
 
         if(reserve1 == 0 && reserve2 == 0) {
-            (amount1, amount2) = (_amount1Desired, _amount2Desired);
+            (amount1, amount2) = (_amount1, _amount2);
         } else {
-            uint256 amount2Optimal = HelperLibrary.getEqualAmount(_amount1Desired, reserve1, reserve2);
+            uint256 amount2Optimal = HelperLibrary.getEqualAmount(_amount1, reserve1, reserve2);
 
-            if(amount2Optimal <= _amount2Desired) {
-                require(amount2Optimal >= _amount2Min, "ROUTER: INSUFFICIENT_AMOUNT_2");
-                (amount1, amount2) = (_amount1Desired, amount2Optimal);
+            if(amount2Optimal <= _amount2) {
+                (amount1, amount2) = (_amount1, amount2Optimal);
             } else {
-                uint256 amount1Optimal = HelperLibrary.getEqualAmount(_amount2Desired, reserve2, reserve1);
-                require(amount1Optimal <= _amount1Desired, "ROUTER: NOT_OPTIMAL");
-                require(amount1Optimal >= _amount1Min, "ROUTER: INSUFFICIENT_AMOUNT_1");
-                (amount1, amount2) = (amount1Optimal, _amount2Desired);
+                uint256 amount1Optimal = HelperLibrary.getEqualAmount(_amount2, reserve2, reserve1);
+                require(amount1Optimal <= _amount1, "ROUTER: NOT_OPTIMAL");
+                (amount1, amount2) = (amount1Optimal, _amount2);
             }
         }
 
@@ -65,19 +64,15 @@ contract Router is ReentrancyGuard {
     function addLiquidity(
         address _token1,
         address _token2,
-        uint256 _amount1Desired, // amount that liquidity provider want to add
-        uint256 _amount2Desired,
-        uint256 _amount1Min, // min amount
-        uint256 _amount2Min, // i think use it on slippage 
+        uint256 _amount1,
+        uint256 _amount2,
         uint8 _fee
     ) external nonReentrant {
         (uint256 amount1, uint256 amount2) = _addLiquidity(
             _token1,
             _token2,
-            _amount1Desired,
-            _amount2Desired,
-            _amount1Min,
-            _amount2Min,
+            _amount1,
+            _amount2,
             _fee
         );
 
