@@ -104,7 +104,7 @@ contract LiquidityToken {
         bytes32 s
     ) external {
         require(deadline >= block.timestamp, "EXPIRED");
-        bytes32 digest = keccak256( // * they are generating a hash to verify the signature
+        bytes32 digest = keccak256(
             abi.encodePacked(
                 "\x19\x01",
                 DOMAIN_SEPARATOR,

@@ -20,12 +20,6 @@ contract Pool is ReentrancyGuard, LiquidityToken {
     uint120 private reserve2;
     uint8 private fee;
 
-    mapping(address => AggregatorV3Interface) s_priceFeeds;
-
-    //////////////////////
-    ////   Events   /////
-    ////////////////////
-
     event Mint(
         uint256 indexed liquidityAmount,
         address token1,
@@ -53,13 +47,7 @@ contract Pool is ReentrancyGuard, LiquidityToken {
     ///// Main functions /////
     /////////////////////////
 
-    constructor(
-        address[2] memory _pair,
-        AggregatorV3Interface[2] memory _priceFeeds,
-        uint8 _fee
-    ) {
-        s_priceFeeds[_pair[0]] = AggregatorV3Interface(_priceFeeds[0]);
-        s_priceFeeds[_pair[1]] = AggregatorV3Interface(_priceFeeds[1]);
+    constructor(address[2] memory _pair, uint8 _fee) {
         token1 = _pair[0];
         token2 = _pair[1];
         fee = _fee;
@@ -114,7 +102,7 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         uint256 _amountOut1,
         uint256 _amountOut2,
         address _to
-    ) external nonReentrant {
+    ) external nonReentrant returns (uint256 amountOut) {
         (uint120 _reserve1, uint120 _reserve2, ) = getReserves(); // gas savings
         require(_amountOut1 > 0 || _amountOut2 > 0, "Insufficient amount for swap");
         require(_amountOut1 < _reserve1 && _amountOut2 < _reserve2, "Insufficient liquidity");
@@ -123,36 +111,30 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         if (_amountOut1 > 0) HelperLibrary._safeTranfer(_token1, _to, _amountOut1);
         if (_amountOut2 > 0) HelperLibrary._safeTranfer(_token2, _to, _amountOut2);
 
+        amountOut = _amountOut1 > 0 ? _amountOut1 : _amountOut2;
         reserve1 = uint120(IERC20(_token1).balanceOf(address(this)));
         reserve2 = uint120(IERC20(_token2).balanceOf(address(this)));
         emit Swap(_token1, _amountOut1, _token2, _amountOut2);
     }
 
-    function getAmountOut(
-        address _tokenIn,
-        uint256 _amountIn,
-        address _tokenOut
-    ) public view returns (uint256 amountOut) {
-        (uint256 inPrice, uint256 inDecimals) = getLatestPrice(_tokenIn);
-        uint256 totalInLiquidity = (inPrice / 10**inDecimals) *
-            IERC20(_tokenIn).balanceOf(address(this));
-
-        (uint256 outPrice, uint256 outDecimals) = getLatestPrice(_tokenOut);
-        uint256 totalOutLiquidity = (outPrice / 10**outDecimals) *
-            IERC20(_tokenOut).balanceOf(address(this));
-
+    function getAmountOut(address _tokenIn, uint256 _amountIn)
+        external
+        view
+        returns (uint256 amountOut)
+    {
         // deci -> 2 (mutiple fee by 100 in frontend)
-        (, , uint8 _fee) = getReserves();
-        uint256 numerator = totalOutLiquidity * _amountIn * inPrice * _fee;
-        uint256 denominator = 10**inDecimals * totalInLiquidity * 10000; // 10000 -> 100 of percent, and 100 of frontend
+        (uint256 _reserve1, uint256 _reserve2, uint8 _fee) = getReserves();
+        (address _token1, ) = getTokens();
+
+        (uint256 reserveIn, uint256 reserveOut) = _token1 == _tokenIn
+            ? (_reserve1, _reserve2)
+            : (_reserve2, _reserve1);
+
+        uint256 amountInWithFee = _amountIn * (10000 - _fee);
+        uint256 numerator = (reserveOut * amountInWithFee);
+        uint256 denominator = (reserveIn * 10000) + amountInWithFee;
 
         amountOut = numerator / denominator;
-    }
-
-    function getLatestPrice(address _token) public view returns (uint256, uint256) {
-        (, int256 price, , , ) = s_priceFeeds[_token].latestRoundData();
-        uint256 decimals = uint256(s_priceFeeds[_token].decimals());
-        return (uint256(price), decimals);
     }
 
     function getReserves()

@@ -3,9 +3,17 @@ const { ethers } = require("hardhat");
 const { networkConfig } = require("../helper-hardhat-config");
 
 describe("smart contract tests", function () {
-    const amount1 = ethers.utils.parseEther("1");
-    const amount2 = ethers.utils.parseEther("1667.37451386");
-    let dex, pool, wethToken, user, wethTokenAddress, daiTokenAddress, daiToken, user2;
+    const amount1 = ethers.utils.parseEther("1000000");
+    const amount2 = ethers.utils.parseEther("1654000000");
+    let factory,
+        wethToken,
+        user,
+        wethTokenAddress,
+        daiTokenAddress,
+        daiToken,
+        user2,
+        library,
+        router;
     beforeEach(async function () {
         const accounts = await ethers.getSigners(2);
         user = accounts[0];
@@ -24,51 +32,77 @@ describe("smart contract tests", function () {
         await daiToken.deployed({ "from": user });
         daiTokenAddress = daiToken.address;
 
-        const contract = await ethers.getContractFactory("Dex");
-        dex = await contract.deploy(
+        const libraryContact = await ethers.getContractFactory("HelperLibrary");
+        library = await libraryContact.deploy();
+        // prettier-ignore
+        await library.deployed({ "from": user });
+
+        const factoryContract = await ethers.getContractFactory("Factory", {
+            libraries: {
+                HelperLibrary: library.address,
+            },
+        });
+        factory = await factoryContract.deploy(
             [wethTokenAddress, daiTokenAddress],
             [networkConfig[chainId]["ethUsdPriceFeed"], networkConfig[chainId]["daiUsdPriceFeed"]]
         );
         // prettier-ignore
-        await dex.deployed({ "from": user });
+        await factory.deployed({ "from": user });
+
+        const routerContract = await ethers.getContractFactory("Router", {
+            libraries: {
+                HelperLibrary: library.address,
+            },
+        });
+        router = await routerContract.deploy(factory.address);
+        // prettier-ignore
+        await router.deployed({ "from": user });
     });
 
-    /////////////////////////
-    /////   Dex test   //////
-    ////////////////////////
-
-    describe("dex unit tests", function () {});
-
-    ////////////////////////
-    /////  Pool test //////
-    //////////////////////
-
-    describe("pool unit test", function () {
+    describe("dex unit test", function () {
         beforeEach(async function () {});
         describe("swap", function () {
             it("calculates tokens to be sent", async function () {
-                await dex.createPool(wethTokenAddress, amount1, daiTokenAddress, amount2, 3);
-                const poolAddress = await dex.getPoolAddress(wethTokenAddress, daiTokenAddress);
-                const pool = await ethers.getContractAt("Pool", poolAddress);
-                const p1 = await pool.getLatestPrice(wethTokenAddress);
-                const p2 = await pool.getLatestPrice(daiTokenAddress);
-                await wethToken.approve(poolAddress, ethers.utils.parseEther("100"));
-                await daiToken.approve(poolAddress, ethers.utils.parseEther("1000000000000"));
-                await pool.addLiquidity(wethTokenAddress, amount1, daiTokenAddress, amount2);
-                console.log(ethers.utils.formatUnits(parseInt(p1.toString()), "8"));
-                console.log(ethers.utils.formatUnits(parseInt(p2.toString()), "8"));
-                await pool.getAmount(
+                await factory.createPool(wethTokenAddress, daiTokenAddress, 30);
+                await wethToken.approve(
+                    router.address,
+                    ethers.utils.parseEther("1000000000000000")
+                );
+                await daiToken.approve(
+                    router.address,
+                    ethers.utils.parseEther("1000000000000000000")
+                );
+                await router.addLiquidity(wethTokenAddress, amount1, daiTokenAddress, amount2);
+                const poolAddress = await factory.getPoolAddress(
                     wethTokenAddress,
-                    ethers.utils.parseEther("0.3"),
                     daiTokenAddress
                 );
-                const amt = await pool.getAmount(
+                const pool = await ethers.getContractAt("Pool", poolAddress);
+                const r1 = await pool.getReserves();
+                // console.log(r1._reserve1);
+                // console.log(ethers.utils.formatEther(r1._reserve2));
+                // const p1 = await pool.getLatestPrice(wethTokenAddress);
+                // const p2 = await pool.getLatestPrice(daiTokenAddress);
+
+                // // await pool.addLiquidity(wethTokenAddress, amount1, daiTokenAddress, amount2);
+                // console.log("weth price", ethers.utils.formatUnits(parseInt(p1.toString()), "8"));
+                // console.log("dai price", ethers.utils.formatUnits(parseInt(p2.toString()), "8"));
+                let amt = await pool.getAmountOut(
                     daiTokenAddress,
-                    ethers.utils.parseEther("100"),
-                    wethTokenAddress
+                    ethers.utils.parseEther("1681.52085106")
                 );
 
-                console.log("amt", ethers.utils.formatEther(amt));
+                console.log("amountOut", ethers.utils.formatEther(amt));
+
+                // console.log("in balance", ethers.utils.formatEther(amt._totalInLiquidity));
+                // console.log("out balance", ethers.utils.formatEther(amt._totalOutLiquidity));
+
+                //     amt = await pool.getAmountOutWithoutFee(
+                //         daiTokenAddress,
+                //         ethers.utils.parseEther("100"),
+                //         wethTokenAddress
+                //     );
+                //     console.log("amt", ethers.utils.formatEther(amt));
             });
         });
     });

@@ -4,6 +4,7 @@ const {
     VERIFICATION_BLOCK_CONFIRMATIONS,
     networkConfig,
 } = require("../helper-hardhat-config");
+const { verify } = require("../utils/verify");
 
 module.exports = async function ({ getNamedAccounts, deployments }) {
     const { deployer } = await getNamedAccounts();
@@ -26,14 +27,38 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     ];
 
     log("-----------------------------------------------------------");
-    log("deploying......");
+    log("deploying factory......");
 
-    const dex = await deploy("Dex", {
+    const factory = await deploy("Factory", {
         from: deployer,
         log: true,
         args: args,
         waitConfirmations: waitConfirmations,
     });
 
-    log("Deployed Dex!");
+    log("-----------------------------------------------------------");
+    log("Deploying Router....");
+
+    const router = await deploy("Router", {
+        from: deployer,
+        log: true,
+        args: [factory.address],
+        waitConfirmations: waitConfirmations,
+    });
+
+    log("-----------------------------------------------------------");
+    log("Deploying liquidity token....");
+
+    const token = await deploy("LiquidityToken", {
+        from: deployer,
+        log: true,
+        args: [],
+        waitConfirmations: waitConfirmations,
+    });
+
+    //     if (!developmentChains.includes(network.name)) {
+    //         await verify(factory.address, args);
+    //         await verify(router.address, [factory.address]);
+    //         await verify(token.address, []);
+    //     }
 };

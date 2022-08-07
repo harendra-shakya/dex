@@ -10,6 +10,8 @@ contract Factory {
     address[2][] private s_allPairs;
 
     mapping(address => AggregatorV3Interface) s_priceFeeds;
+
+    // token1 & token2 -> pool address
     mapping(address => mapping(address => address)) s_pairTokens;
 
     constructor(address[] memory _allowedTokens, address[] memory _priceFeeds) {
@@ -28,12 +30,7 @@ contract Factory {
         require(s_pairTokens[_token1][_token2] == address(0), "Pair already exist");
 
         address[2] memory pairTokens = [_token1, _token2];
-        AggregatorV3Interface[2] memory priceFeeds = [
-            s_priceFeeds[_token1],
-            s_priceFeeds[_token2]
-        ];
-
-        Pool _pool = new Pool(pairTokens, priceFeeds, _fee);
+        Pool _pool = new Pool(pairTokens, _fee);
         s_pairTokens[_token1][_token2] = address(_pool);
         s_pairTokens[_token2][_token1] = address(_pool);
         s_allPairs.push(pairTokens);
@@ -41,5 +38,11 @@ contract Factory {
 
     function getPoolAddress(address _token1, address _token2) external view returns (address) {
         return s_pairTokens[_token1][_token2];
+    }
+
+    function getLatestPrice(address _token) public view returns (uint256, uint256) {
+        (, int256 price, , , ) = s_priceFeeds[_token].latestRoundData();
+        uint256 decimals = uint256(s_priceFeeds[_token].decimals());
+        return (uint256(price), decimals);
     }
 }
