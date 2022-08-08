@@ -35,9 +35,13 @@ library HelperLibrary {
         require(success && (data.length == 0 || abi.decode(data, (bool))), "Transfer Failed!");
     }
 
-    function getEqualAmount( uint256 amount1, uint256 reserve1, uint256 reserve2) internal pure returns (uint256 amount2) {
-        require(amount1 > 0, 'ROUTER: INSUFFICIENT_AMOUNT');
-        require(reserve1 > 0 && reserve2 > 0, 'ROUTER: INSUFFICIENT_LIQUIDITY');
+    function getEqualAmount(
+        uint256 amount1,
+        uint256 reserve1,
+        uint256 reserve2
+    ) internal pure returns (uint256 amount2) {
+        require(amount1 > 0, "ROUTER: INSUFFICIENT_AMOUNT");
+        require(reserve1 > 0 && reserve2 > 0, "ROUTER: INSUFFICIENT_LIQUIDITY");
         amount2 = (amount1 * reserve2) / reserve1;
     }
 }

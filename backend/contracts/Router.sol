@@ -42,22 +42,25 @@ contract Router is ReentrancyGuard {
             pool = IFactory(factory).getPoolAddress(_token1, _token2, _fee);
         }
 
-        (uint256 reserve1, uint256 reserve2,) = IPool(pool).getReserves();
+        (uint256 reserve1, uint256 reserve2, ) = IPool(pool).getReserves();
 
-        if(reserve1 == 0 && reserve2 == 0) {
+        if (reserve1 == 0 && reserve2 == 0) {
             (amount1, amount2) = (_amount1, _amount2);
         } else {
             uint256 amount2Optimal = HelperLibrary.getEqualAmount(_amount1, reserve1, reserve2);
 
-            if(amount2Optimal <= _amount2) {
+            if (amount2Optimal <= _amount2) {
                 (amount1, amount2) = (_amount1, amount2Optimal);
             } else {
-                uint256 amount1Optimal = HelperLibrary.getEqualAmount(_amount2, reserve2, reserve1);
+                uint256 amount1Optimal = HelperLibrary.getEqualAmount(
+                    _amount2,
+                    reserve2,
+                    reserve1
+                );
                 require(amount1Optimal <= _amount1, "ROUTER: NOT_OPTIMAL");
                 (amount1, amount2) = (amount1Optimal, _amount2);
             }
         }
-
     }
 
     // *** Add Liquidity ***
@@ -79,6 +82,9 @@ contract Router is ReentrancyGuard {
         address _pool = IFactory(factory).getPoolAddress(_token1, _token2, _fee);
         HelperLibrary._safeTranferFrom(_token1, msg.sender, _pool, amount1);
         HelperLibrary._safeTranferFrom(_token2, msg.sender, _pool, amount2);
+        // IERC20(_pool).transferFrom(msg.sender, _pool, amount1);
+        // IERC20(_pool).transferFrom(msg.sender, _pool, amount2);
+
         IPool(_pool).mint(msg.sender);
         emit LiquidityAdded(_token1, amount1, _token2, amount2);
     }
@@ -91,11 +97,20 @@ contract Router is ReentrancyGuard {
         uint8 _fee
     ) external nonReentrant {
         address _pool = IFactory(factory).getPoolAddress(_token1, _token2, _fee);
-        require(_liquidity > 0, "ROUTER: Insufficient amount");
         require(_pool != address(0), "ROUTER: Pool doesn't exist");
-        require(_liquidity <= IERC20(_pool).balanceOf(msg.sender), "ROUTER: Insufficient liquidity");
+        require(
+            _liquidity > 0 && IERC20(_pool).balanceOf(msg.sender) > 0,
+            "ROUTER: Insufficient amount"
+        );
+        
+        require(
+            _liquidity <= IERC20(_pool).balanceOf(msg.sender),
+            "ROUTER: Insufficient liquidity"
+        );
 
         HelperLibrary._safeTranferFrom(_pool, msg.sender, _pool, _liquidity);
+        // require(1 == 0, "lol");
+        // IERC20(_pool).transferFrom(msg.sender, _pool, _liquidity);
         IPool(_pool).burn(msg.sender);
         emit LiquidityRemoved(_token1, _token2, _liquidity);
     }
@@ -108,9 +123,9 @@ contract Router is ReentrancyGuard {
     ) external nonReentrant {
         require(_path.length >= 2, "ROUTER: INVALID_PATH");
         require(_amountIn > 0, "ROUTER: Insufficient amount");
-        HelperLibrary._safeTranferFrom(_path[0], msg.sender, address(this), _amountIn);
+        HelperLibrary._safeTranferFrom(_path[0], msg.sender, getPool(_path[0], _path[1]), _amountIn);
 
-        for (uint256 i = 0; i < _path.length; i++) {
+        for (uint256 i = 0; i < _path.length - 1; i++) {
             (address tokenIn, address tokenOut) = (_path[i], _path[i + 1]);
 
             address _pool = getPool(tokenIn, tokenOut);

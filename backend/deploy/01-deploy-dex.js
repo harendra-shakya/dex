@@ -15,24 +15,13 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
 
     const chainId = network.config.chainId;
 
-    const args = [
-        networkConfig[chainId]["tokenAddresses"],
-        [
-            networkConfig[chainId]["btcUsdPriceFeed"],
-            networkConfig[chainId]["ethUsdPriceFeed"],
-            networkConfig[chainId]["daiUsdPriceFeed"],
-            networkConfig[chainId]["usdcUsdPriceFeed"],
-            networkConfig[chainId]["anonimUsdPriceFeed"],
-        ],
-    ];
-
     log("-----------------------------------------------------------");
     log("deploying factory......");
 
     const factory = await deploy("Factory", {
         from: deployer,
         log: true,
-        args: args,
+        args: [],
         waitConfirmations: waitConfirmations,
     });
 

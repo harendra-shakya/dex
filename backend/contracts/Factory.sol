@@ -6,20 +6,10 @@ import "./Pool.sol";
 pragma solidity ^0.8.7;
 
 contract Factory {
-    address[] private s_allowedTokens;
     address[2][] private s_allPairs;
-
-    mapping(address => AggregatorV3Interface) s_priceFeeds;
 
     // token1 & token2 -> pool address
     mapping(address => mapping(address => mapping(uint8 => address))) s_pairTokens;
-
-    constructor(address[] memory _allowedTokens, address[] memory _priceFeeds) {
-        s_allowedTokens = _allowedTokens;
-        for (uint256 i = 0; i < _allowedTokens.length; i++) {
-            s_priceFeeds[_allowedTokens[i]] = AggregatorV3Interface(_priceFeeds[i]);
-        }
-    }
 
     function createPool(
         address _token1,
@@ -44,5 +34,4 @@ contract Factory {
     ) external view returns (address) {
         return s_pairTokens[_token1][_token2][_fee];
     }
-
 }

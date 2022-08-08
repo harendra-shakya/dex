@@ -74,7 +74,7 @@ contract Pool is ReentrancyGuard, LiquidityToken {
                 2;
         }
 
-        require(liquidity > 0, "Insufficient amount for burn");
+        require(liquidity > 0, "POOL: MINT_INSUFFICIENT_LIQUIDITY");
         _mint(_to, liquidity);
         reserve1 = uint120(balance1);
         reserve2 = uint120(balance2);
@@ -88,9 +88,9 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         uint256 liquidityAmount = balanceOf[address(this)];
         amount1 = (liquidityAmount * _reserve1) / _totalSupply;
         amount2 = (liquidityAmount * _reserve2) / _totalSupply;
-        require(amount1 > 0 && amount2 > 0, "Insufficient amount for burn");
+        require(amount1 > 0 && amount2 > 0, "POOL: BURN_INSUFFICIENT_AMOUNT");
 
-        _burn(_to, liquidityAmount);
+        _burn(address(this), liquidityAmount);
         HelperLibrary._safeTranfer(_token1, _to, amount1);
         HelperLibrary._safeTranfer(_token2, _to, amount2);
 
@@ -105,8 +105,8 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         address _to
     ) external nonReentrant returns (uint256 amountOut) {
         (uint120 _reserve1, uint120 _reserve2, ) = getReserves(); // gas savings
-        require(_amountOut1 > 0 || _amountOut2 > 0, "Insufficient amount for swap");
-        require(_amountOut1 < _reserve1 && _amountOut2 < _reserve2, "Insufficient liquidity");
+        require(_amountOut1 > 0 || _amountOut2 > 0, "POOL: SWAP_INSUFFICIENT_AMOUNT");
+        require(_amountOut1 < _reserve1 && _amountOut2 < _reserve2, "POOL: SWAP_INSUFFICIENT_LIQUIDITY");
 
         (address _token1, address _token2) = getTokens(); // gas savings
         if (_amountOut1 > 0) HelperLibrary._safeTranfer(_token1, _to, _amountOut1);
@@ -131,7 +131,7 @@ contract Pool is ReentrancyGuard, LiquidityToken {
             ? (_reserve1, _reserve2)
             : (_reserve2, _reserve1);
 
-        uint256 amountInWithFee = _amountIn * (10000 - _fee);
+        uint256 amountInWithFee = _amountIn * (10000 - fee);
         uint256 numerator = (reserveOut * amountInWithFee);
         uint256 denominator = (reserveIn * 10000) + amountInWithFee;
 
