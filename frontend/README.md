@@ -1,0 +1,3 @@
+Frontend in progress....
+
+I'm learning new things for frontend like typescript.

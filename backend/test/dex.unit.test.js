@@ -47,10 +47,10 @@ describe("dex tests", function () {
         // prettier-ignore
         await wbtcToken.deployed({ "from": user });
 
-        const libraryContact = await ethers.getContractFactory("HelperLibrary");
-        library = await libraryContact.deploy();
-        // prettier-ignore
-        await library.deployed({ "from": user });
+        // const libraryContact = await ethers.getContractFactory("HelperLibrary");
+        // library = await libraryContact.deploy();
+        // // prettier-ignore
+        // await library.deployed({ "from": user });
 
         const factoryContract = await ethers.getContractFactory("Factory");
         factory = await factoryContract.deploy();
@@ -110,22 +110,15 @@ describe("dex tests", function () {
                 router.removeLiquidity(smallAmount1, wethTokenAddress, daiTokenAddress, 100)
             ).to.be.revertedWith("ROUTER: Pool doesn't exist");
         });
-        it("removes liquidity and sends back liuidity", async function () {
+        it("removes liquidity and sends back assets", async function () {
             const liquidityBeforeBal = await pool.balanceOf(user.address);
             const wethBeforeBal = await wethToken.balanceOf(user.address);
             const daiBeforeBal = await daiToken.balanceOf(user.address);
-            // console.log("wethBeforeBal", ethers.utils.formatEther(wethBeforeBal));
+
             await router.removeLiquidity(smallAmount1, wethTokenAddress, daiTokenAddress, 30);
             const liquidityAfterBal = await pool.balanceOf(user.address);
             const wethAfterBal = await wethToken.balanceOf(user.address);
             const daiAfterBal = await daiToken.balanceOf(user.address);
-
-            const poolBal = await pool.balanceOf(pool.address);
-            // console.log("daiBeforeBal", ethers.utils.formatEther(daiBeforeBal));
-            // console.log("wethAfterBal", ethers.utils.formatEther(wethAfterBal));
-            // console.log("daiAfterBal", ethers.utils.formatEther(daiAfterBal));
-            const totalSupply = await pool.totalSupply();
-            const reserves = await pool.getReserves();
 
             await expect(liquidityBeforeBal).to.equal(liquidityAfterBal.add(smallAmount1));
             assert(wethAfterBal > wethBeforeBal);
@@ -135,11 +128,9 @@ describe("dex tests", function () {
     describe("swap", async function () {
         const swapAmount = ethers.utils.parseEther("1");
         it("swaps tokens", async function () {
-            // const liquidityBeforeBal = await pool.balanceOf(user.address);
             const wethBeforeBal = await wethToken.balanceOf(user.address);
             const daiBeforeBal = await daiToken.balanceOf(user.address);
-            // console.log("wethBeforeBal", ethers.utils.formatEther(wethBeforeBal));
-            // const totalSupply = await pool.totalSupply();
+
             const reserves = await pool.getReserves();
 
             const amountInWithFee = swapAmount.mul((10000 - 30).toString());
@@ -150,32 +141,12 @@ describe("dex tests", function () {
             await router._swap(swapAmount, [wethTokenAddress, daiTokenAddress], user.address);
             const wethAfterBal = await wethToken.balanceOf(user.address);
             const daiAfterBal = await daiToken.balanceOf(user.address);
-            // const txReceipt = await tx.wait(1);
-            // const gas = txReceipt.cumulativeGasUsed.mul(txReceipt.effectiveGasPrice);
-            // const liquidityAfterBal = await pool.balanceOf(user.address);
-
-            // const poolBal = await pool.balanceOf(pool.address);
-            // console.log("wethAfterBal", ethers.utils.formatEther(wethAfterBal));
-
-            // console.log("      daiBeforeBal", ethers.utils.formatEther(daiBeforeBal));
-            // console.log("       daiAfterBal", ethers.utils.formatEther(daiAfterBal));
-            // console.log(
-            //     "expected amountOut",
-            //     ethers.utils.formatEther(daiAfterBal.sub(daiBeforeBal))
-            // );
-            // console.log("  actual amountOut", ethers.utils.formatEther(amountOut));
-
-            // console.log(
-            //     "totaldaiBeforeBal",
-            //     ethers.utils.formatEther(daiBeforeBal.add(amountOut))
-            // );
 
             expect(wethBeforeBal).to.equal(wethAfterBal.add(swapAmount));
             expect(daiBeforeBal.add(amountOut)).to.equal(daiAfterBal);
         });
         it("swaps tokens even if particular pair not exists", async function () {
             await router.addLiquidity(daiTokenAddress, usdcToken.address, amount2, amount2, 30);
-            // await router.addLiquidity(wethToken.address, usdcToken.address, amount1, amount2, 30);
 
             const poolAddress = await factory.getPoolAddress(
                 daiTokenAddress,
@@ -186,8 +157,7 @@ describe("dex tests", function () {
 
             const wethBeforeBal = await wethToken.balanceOf(user.address);
             const usdcBeforeBal = await usdcToken.balanceOf(user.address);
-            // console.log("wethBeforeBal", ethers.utils.formatEther(wethBeforeBal));
-            // const totalSupply = await pool.totalSupply();
+
             const reserves = await pool.getReserves();
             const reserves2 = await usdcPool.getReserves();
 
@@ -201,10 +171,6 @@ describe("dex tests", function () {
             denominator = reserves2._reserve1.mul("10000").add(amountInWithFee);
             amountOut = numerator.div(denominator);
 
-            // numerator = reserves2._reserve2.mul(amountInWithFee);
-            // denominator = reserves2._reserve1.mul("10000").add(amountInWithFee);
-            // const amountOut2 = numerator.div(denominator);
-
             await router._swap(
                 swapAmount,
                 [wethTokenAddress, daiTokenAddress, usdcToken.address], // we want weth --> usdc
@@ -213,27 +179,6 @@ describe("dex tests", function () {
 
             const wethAfterBal = await wethToken.balanceOf(user.address);
             const usdcAfterBal = await usdcToken.balanceOf(user.address);
-            // const txReceipt = await tx.wait(1);
-            // const gas = txReceipt.cumulativeGasUsed.mul(txReceipt.effectiveGasPrice);
-            // const liquidityAfterBal = await pool.balanceOf(user.address);
-
-            // const poolBal = await pool.balanceOf(pool.address);
-            // console.log("wethAfterBal", ethers.utils.formatEther(wethAfterBal));
-
-            console.log("      usdcBeforeBal", ethers.utils.formatEther(usdcBeforeBal));
-            console.log("       usdcAfterBal", ethers.utils.formatEther(usdcAfterBal));
-            console.log("expected amountOut", ethers.utils.formatEther(amountOut));
-
-            console.log(
-                "  actual amountOut",
-                ethers.utils.formatEther(usdcAfterBal.sub(usdcBeforeBal))
-            );
-
-            console.log(
-                "totalusdcBeforeBal",
-                ethers.utils.formatEther(usdcBeforeBal.add(amountOut))
-            );
-
             expect(wethBeforeBal).to.equal(wethAfterBal.add(swapAmount));
             expect(usdcBeforeBal.add(amountOut)).to.equal(usdcAfterBal);
         });

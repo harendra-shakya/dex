@@ -13,8 +13,6 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
         ? VERIFICATION_BLOCK_CONFIRMATIONS
         : 1;
 
-    const chainId = network.config.chainId;
-
     log("-----------------------------------------------------------");
     log("deploying factory......");
 
@@ -45,9 +43,9 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
         waitConfirmations: waitConfirmations,
     });
 
-    //     if (!developmentChains.includes(network.name)) {
-    //         await verify(factory.address, args);
-    //         await verify(router.address, [factory.address]);
-    //         await verify(token.address, []);
-    //     }
+    if (!developmentChains.includes(network.name)) {
+        await verify(factory.address, args);
+        await verify(router.address, [factory.address]);
+        await verify(token.address, []);
+    }
 };
