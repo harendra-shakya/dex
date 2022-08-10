@@ -3,7 +3,8 @@
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../Factory.sol";
+import "../interfaces/IFactory.sol";
+// import "../Factory.sol";
 
 pragma solidity ^0.8.7;
 
@@ -43,5 +44,16 @@ library HelperLibrary {
         require(amount1 > 0, "ROUTER: INSUFFICIENT_AMOUNT");
         require(reserve1 > 0 && reserve2 > 0, "ROUTER: INSUFFICIENT_LIQUIDITY");
         amount2 = (amount1 * reserve2) / reserve1;
+    }
+
+    function getPoolAddress(address _factory, address _tokenIn, address _tokenOut) internal view returns (address) {
+        address pool = IFactory(_factory).getPoolAddress(_tokenIn, _tokenOut, 1); // 0.01%
+        if (pool != address(0)) return pool;
+
+        pool = IFactory(_factory).getPoolAddress(_tokenIn, _tokenOut, 30); // 0.3%
+        if (pool != address(0)) return pool;
+
+        pool = IFactory(_factory).getPoolAddress(_tokenIn, _tokenOut, 100); // 1%
+        return pool;
     }
 }

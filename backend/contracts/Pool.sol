@@ -88,7 +88,8 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         uint256 liquidityAmount = balanceOf[address(this)];
         amount1 = (liquidityAmount * _reserve1) / _totalSupply;
         amount2 = (liquidityAmount * _reserve2) / _totalSupply;
-        require(amount1 > 0 && amount2 > 0, "POOL: BURN_INSUFFICIENT_AMOUNT");
+        require(amount1 > 0 && amount2 > 0, "POOL: INSUFFICIENT_AMOUNT");
+        require(liquidityAmount > 0, "POOL: BURN_INSUFFICIENT_AMOUNT");
 
         _burn(address(this), liquidityAmount);
         HelperLibrary._safeTranfer(_token1, _to, amount1);
