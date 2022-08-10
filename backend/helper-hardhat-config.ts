@@ -1,7 +1,20 @@
-const networkConfig = {
+type NetworkConfigItem = {
+    name: string;
+    tokenAddresses: string[];
+    btcUsdPriceFeed: string;
+    ethUsdPriceFeed: string;
+    daiUsdPriceFeed: string;
+    usdcUsdPriceFeed: string;
+    keepersUpdateInterval: string;
+};
+
+type NetworkConfigMap = {
+    [chainId: string]: NetworkConfigItem;
+};
+
+export const networkConfig: NetworkConfigMap = {
     default: {
         name: "hardhat",
-        keepersUpdateInterval: "30",
         tokenAddresses: [
             "0x8455471D6d4B2B260c5f31ec461A167Aa7CD1319",
             "0x231F96A75e9769eF0724BdCb2e65B4E5DF778da3",
@@ -13,7 +26,6 @@ const networkConfig = {
         ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
         daiUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         usdcUsdPriceFeed: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
-        anonimUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         keepersUpdateInterval: "30",
     },
     1337: {
@@ -29,7 +41,6 @@ const networkConfig = {
         ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
         daiUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         usdcUsdPriceFeed: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
-        anonimUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         keepersUpdateInterval: "30",
     },
     31337: {
@@ -45,13 +56,10 @@ const networkConfig = {
         ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
         daiUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         usdcUsdPriceFeed: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
-        anonimUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         keepersUpdateInterval: "30",
     },
     4: {
         name: "rinkeby",
-        gasPrice: "10000000007",
-        gasLimit: "50000000000",
         tokenAddresses: [
             "0xe7741e436d63d8CAF5AAAF2AEe6F789fc69bFbEe",
             "0x623a957272c015Fe4A3646874cCe78864945EAe2",
@@ -63,13 +71,10 @@ const networkConfig = {
         ethUsdPriceFeed: "0x8A753747A1Fa494EC906cE90E9f37563A8AF630e",
         daiUsdPriceFeed: "0x2bA49Aaa16E6afD2a993473cfB70Fa8559B523cF",
         usdcUsdPriceFeed: "0xa24de01df22b63d23Ebc1882a5E3d4ec0d907bFB",
-        anonimUsdPriceFeed: "0x2bA49Aaa16E6afD2a993473cfB70Fa8559B523cF",
         keepersUpdateInterval: "30",
     },
     80001: {
         name: "mumbai",
-        gasPrice: "10000000007",
-        gasLimit: "50000000000",
         tokenAddresses: [
             "0x049856981Fc63219c426fcFA88d214Bf21b67a0E",
             "0xd4ac619a9A98e25eB6c049a48f3e279dA06eC913",
@@ -81,13 +86,10 @@ const networkConfig = {
         ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
         daiUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         usdcUsdPriceFeed: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
-        anonimUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         keepersUpdateInterval: "30",
     },
     3: {
         name: "ropsten",
-        gasPrice: "10000000007",
-        gasLimit: "50000000000",
         tokenAddresses: [
             "0xBF1006a495cdDc4386ef7C527D32D280aC700Bc9",
             "0x21C9303F872540f6A62FdAa5BCCCD7e093726aBD",
@@ -99,22 +101,9 @@ const networkConfig = {
         ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
         daiUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
         usdcUsdPriceFeed: "0x572dDec9087154dC5dfBB1546Bb62713147e0Ab0",
-        anonimUsdPriceFeed: "0x0FCAa9c899EC5A91eBc3D5Dd869De833b06fB046",
-        keepersUpdateInterval: "30",
-    },
-    1: {
-        name: "mainnet",
         keepersUpdateInterval: "30",
     },
 };
 
-const developmentChains = ["hardhat", "localhost"];
-const VERIFICATION_BLOCK_CONFIRMATIONS = 6;
-const iWethContractAddress = "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619";
-
-module.exports = {
-    networkConfig,
-    developmentChains,
-    VERIFICATION_BLOCK_CONFIRMATIONS,
-    iWethContractAddress,
-};
+export const developmentChains: string[] = ["hardhat", "localhost"];
+export const VERIFICATION_BLOCK_CONFIRMATIONS = 6;

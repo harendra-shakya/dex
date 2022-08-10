@@ -1,10 +1,28 @@
-node_modules
-.env
+# vscode
+.vscode
+
+# hardhat
 artifacts
 cache
-.vscode
 deployments
-gas-report.txt
+node_modules
 coverage
-.notes.md
 coverage.json
+
+# don't push the environment vars!
+.env
+
+# Generated files
+bin/
+gen/
+out/
+build/
+
+# Log Files
+*.log
+
+typechain 
+typechain-types
+
+# gas
+gas-report.txt

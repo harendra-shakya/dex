@@ -106,7 +106,10 @@ contract Pool is ReentrancyGuard, LiquidityToken {
     ) external nonReentrant returns (uint256 amountOut) {
         (uint120 _reserve1, uint120 _reserve2, ) = getReserves(); // gas savings
         require(_amountOut1 > 0 || _amountOut2 > 0, "POOL: SWAP_INSUFFICIENT_AMOUNT");
-        require(_amountOut1 < _reserve1 && _amountOut2 < _reserve2, "POOL: SWAP_INSUFFICIENT_LIQUIDITY");
+        require(
+            _amountOut1 < _reserve1 && _amountOut2 < _reserve2,
+            "POOL: SWAP_INSUFFICIENT_LIQUIDITY"
+        );
 
         (address _token1, address _token2) = getTokens(); // gas savings
         if (_amountOut1 > 0) HelperLibrary._safeTranfer(_token1, _to, _amountOut1);
@@ -131,7 +134,7 @@ contract Pool is ReentrancyGuard, LiquidityToken {
             ? (_reserve1, _reserve2)
             : (_reserve2, _reserve1);
 
-        uint256 amountInWithFee = _amountIn * (10000 - fee);
+        uint256 amountInWithFee = _amountIn * (10000 - _fee);
         uint256 numerator = (reserveOut * amountInWithFee);
         uint256 denominator = (reserveIn * 10000) + amountInWithFee;
 

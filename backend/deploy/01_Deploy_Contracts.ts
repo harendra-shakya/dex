@@ -1,17 +1,22 @@
-const { network } = require("hardhat");
-const {
+import { DeployFunction } from "hardhat-deploy/types";
+import { network } from "hardhat";
+import {
+    networkConfig,
     developmentChains,
     VERIFICATION_BLOCK_CONFIRMATIONS,
-    networkConfig,
-} = require("../helper-hardhat-config");
-const { verify } = require("../utils/verify");
+} from "../helper-hardhat-config";
+import { verify } from "../utils/verify";
 
-module.exports = async function ({ getNamedAccounts, deployments }) {
+const deployFunction: DeployFunction = async ({ getNamedAccounts, deployments }) => {
+    const { deploy, log } = deployments;
+
     const { deployer } = await getNamedAccounts();
-    const { log, deploy } = deployments;
-    const waitConfirmations = !developmentChains.includes(network.name)
-        ? VERIFICATION_BLOCK_CONFIRMATIONS
-        : 1;
+    const chainId: number | undefined = network.config.chainId;
+    if (!chainId) return;
+
+    const waitConfirmations: number = developmentChains.includes(network.name)
+        ? 1
+        : VERIFICATION_BLOCK_CONFIRMATIONS;
 
     log("-----------------------------------------------------------");
     log("deploying factory......");
@@ -44,8 +49,11 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     });
 
     if (!developmentChains.includes(network.name)) {
-        await verify(factory.address, args);
+        await verify(factory.address, []);
         await verify(router.address, [factory.address]);
         await verify(token.address, []);
     }
 };
+
+export default deployFunction;
+deployFunction.tags = ["all", "main"];

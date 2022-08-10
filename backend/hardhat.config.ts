@@ -1,15 +1,16 @@
-require("@nomiclabs/hardhat-waffle");
-require("@nomiclabs/hardhat-etherscan");
-require("hardhat-deploy");
-require("solidity-coverage");
-require("hardhat-gas-reporter");
-require("hardhat-contract-sizer");
-require("dotenv").config();
-require("@nomiclabs/hardhat-ganache");
+import * as dotenv from "dotenv";
 
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
+import type { HardhatUserConfig } from "hardhat/config";
+import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-ethers";
+import "@nomiclabs/hardhat-etherscan";
+import "@typechain/hardhat";
+import "hardhat-deploy";
+import "solidity-coverage";
+import "hardhat-gas-reporter";
+import "hardhat-contract-sizer";
+
+dotenv.config();
 
 const MUMBAI_RPC_URL = process.env.MUMBAI_RPC_URL;
 const ROPSTEN_RPC_URL = process.env.ROPSTEN_RPC_URL;
@@ -22,14 +23,15 @@ const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY;
 const REPORT_GAS = process.env.REPORT_GAS || false;
 
-module.exports = {
+const config: HardhatUserConfig = {
     defaultNetwork: "hardhat",
     networks: {
         hardhat: {
-            chainId: 31337,
             forking: {
-                url: MUMBAI_RPC_URL,
+                url: MUMBAI_RPC_URL!,
+                enabled: true,
             },
+            chainId: 31337,
         },
         localhost: {
             chainId: 31337,
@@ -37,32 +39,28 @@ module.exports = {
         rinkeby: {
             url: RINKEBY_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
+            saveDeployments: true,
             chainId: 4,
         },
         mumbai: {
             url: MUMBAI_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
+            saveDeployments: true,
             chainId: 80001,
-        },
-        ropsten: {
-            url: ROPSTEN_RPC_URL,
-            accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
-            chainId: 3,
         },
     },
     etherscan: {
         apiKey: {
-            rinkeby: ETHERSCAN_API_KEY,
-            ropsten: ETHERSCAN_API_KEY,
-            polygonMumbai: POLYGONSCAN_API_KEY,
+            rinkeby: ETHERSCAN_API_KEY!,
+            kovan: ETHERSCAN_API_KEY!,
+            polygon: POLYGONSCAN_API_KEY!,
         },
     },
     gasReporter: {
-        enabled: REPORT_GAS,
+        enabled: process.env.REPORT_GAS !== undefined,
         currency: "USD",
         outputFile: "gas-report.txt",
         noColors: true,
-        // coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     },
     namedAccounts: {
         deployer: {
@@ -79,6 +77,9 @@ module.exports = {
                 version: "0.8.7",
             },
             {
+                version: "0.6.6",
+            },
+            {
                 version: "0.4.24",
             },
         ],
@@ -86,4 +87,10 @@ module.exports = {
     mocha: {
         timeout: 200000, // 200 seconds max for running tests
     },
+    typechain: {
+        outDir: "typechain",
+        target: "ethers-v5",
+    },
 };
+
+export default config;
