@@ -21,6 +21,7 @@
         "chai": "^4.3.4",
         "ethereum-waffle": "^3.4.0",
         "ethers": "^5.5.1",
+        "fs": "^0.0.1-security",
         "hardhat": "^2.9.0",
         "hardhat-contract-sizer": "^2.4.0",
         "hardhat-deploy": "^0.9.29",

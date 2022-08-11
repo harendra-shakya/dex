@@ -1,8 +1,7 @@
 import { BigNumber, Contract, ContractFactory } from "ethers";
 
-const { expect, assert } = require("chai");
+import { expect, assert } from "chai";
 const { ethers, network } = require("hardhat");
-const { networkConfig } = require("../helper-hardhat-config");
 
 describe("dex tests", function () {
     const amount1 = ethers.utils.parseEther("1000");
