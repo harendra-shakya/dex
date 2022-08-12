@@ -9,7 +9,7 @@ contract Factory {
     address[2][] private s_allPairs;
 
     // token1 & token2 -> pool address
-    mapping(address => mapping(address => mapping(uint8 => address))) s_pairTokens;
+    mapping(address => mapping(address => mapping(uint8 => address))) private s_pairTokens;
 
     function createPool(
         address _token1,
@@ -33,5 +33,9 @@ contract Factory {
         uint8 _fee
     ) external view returns (address) {
         return s_pairTokens[_token1][_token2][_fee];
+    }
+
+    function getAllPairs() external view returns (address[2][] memory) {
+        return s_allPairs;
     }
 }

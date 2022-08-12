@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Modal, useNotification, Input, Select } from "@web3uikit/core";
 import { useMoralis } from "react-moralis";
 import { ethers } from "ethers";
+import contractAddresses from "../constants/networkMapping.json";
+import routerAbi from "../constants/Router.json";
 
 type AddLiquidityModalProps = {
     isVisible: boolean;
-    onClose: void;
+    onClose: () => void;
 };
 
 export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityModalProps) {
@@ -22,13 +24,26 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
 
     async function updateUI() {}
 
-    async function addLiquidity() {}
+    async function addLiquidity() {
+        const _fee = parseFloat(fee) * 100;
 
-    const updateInput1 = async function () {
+        const { ethereum } = window;
+        const provider = await new ethers.providers.Web3Provider(ethereum!);
+        const signer = provider.getSigner();
+        const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
+
+        const address: string = contractAddresses[_chainId]["Router"][0];
+        console.log(address);
+
+        const contract = await new ethers.Contract(address, routerAbi, signer);
+        // await contract.addLiquidity(token1, token2, amount1, amount2, _fee);
+    }
+
+    const updateInput1 = async () => {
         setInput1("100");
     };
 
-    const updateInput2 = async function () {
+    const updateInput2 = async () => {
         setInput2("200");
     };
 
@@ -60,8 +75,8 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                         label="Token1"
                         name="Token1"
                         type="text"
-                        onChange={(event) => {
-                            event.target.value = "10";
+                        onChange={(e) => {
+                            setInput1(e.target.value);
                             updateInput2();
                         }}
                         value={input1}
@@ -71,8 +86,8 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                             label="Token2"
                             name="Token2"
                             type="text"
-                            onChange={(event) => {
-                                event.target.value;
+                            onChange={(e) => {
+                                setInput2(e.target.value);
                                 updateInput1();
                             }}
                             value={input2}
@@ -81,7 +96,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                     <div className="pt-6">
                         <Select
                             defaultOptionIndex={1}
-                            label="Label Text"
+                            label="Fee"
                             onChange={(OptionProps) => {
                                 setFee(OptionProps.label.toString());
                             }}

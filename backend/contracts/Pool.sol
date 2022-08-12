@@ -15,6 +15,7 @@ pragma solidity ^0.8.7;
 contract Pool is ReentrancyGuard, LiquidityToken {
     using SafeMath for uint256;
 
+    uint256 private constant MINIMUM_LIQUIDITY = 1000;
     address private token1;
     address private token2;
     uint120 private reserve1;
@@ -53,8 +54,6 @@ contract Pool is ReentrancyGuard, LiquidityToken {
         token2 = _pair[1];
         fee = _fee;
     }
-
-    uint256 private constant MINIMUM_LIQUIDITY = 1000;
 
     function mint(address _to) external nonReentrant returns (uint256 liquidity) {
         (uint120 _reserve1, uint120 _reserve2, ) = getReserves(); // gas savings
