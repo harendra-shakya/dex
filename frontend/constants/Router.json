@@ -1,0 +1,46 @@
+[
+    {
+        "type": "constructor",
+        "payable": false,
+        "inputs": [{ "type": "address", "name": "_factory" }]
+    },
+    {
+        "type": "function",
+        "name": "_swap",
+        "constant": false,
+        "payable": false,
+        "inputs": [
+            { "type": "uint256", "name": "_amountIn" },
+            { "type": "address[]", "name": "_path" },
+            { "type": "address", "name": "_to" }
+        ],
+        "outputs": []
+    },
+    {
+        "type": "function",
+        "name": "addLiquidity",
+        "constant": false,
+        "payable": false,
+        "inputs": [
+            { "type": "address", "name": "_token1" },
+            { "type": "address", "name": "_token2" },
+            { "type": "uint256", "name": "_amount1" },
+            { "type": "uint256", "name": "_amount2" },
+            { "type": "uint8", "name": "_fee" }
+        ],
+        "outputs": []
+    },
+    {
+        "type": "function",
+        "name": "removeLiquidity",
+        "constant": false,
+        "payable": false,
+        "inputs": [
+            { "type": "uint256", "name": "_liquidity" },
+            { "type": "address", "name": "_token1" },
+            { "type": "address", "name": "_token2" },
+            { "type": "uint8", "name": "_fee" }
+        ],
+        "outputs": []
+    }
+]

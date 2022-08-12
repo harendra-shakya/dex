@@ -1,0 +1,27 @@
+[
+    {
+        "type": "function",
+        "name": "createPool",
+        "constant": false,
+        "payable": false,
+        "inputs": [
+            { "type": "address", "name": "_token1" },
+            { "type": "address", "name": "_token2" },
+            { "type": "uint8", "name": "_fee" }
+        ],
+        "outputs": []
+    },
+    {
+        "type": "function",
+        "name": "getPoolAddress",
+        "constant": true,
+        "stateMutability": "view",
+        "payable": false,
+        "inputs": [
+            { "type": "address", "name": "_token1" },
+            { "type": "address", "name": "_token2" },
+            { "type": "uint8", "name": "_fee" }
+        ],
+        "outputs": [{ "type": "address" }]
+    }
+]
