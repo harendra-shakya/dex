@@ -16,7 +16,7 @@ export default function Pools(): JSX.Element {
         <div>
             {isWeb3Enabled ? (
                 <div>
-                    {parseInt(chainId!) !== 4 ? (
+                    {parseInt(chainId!) === 80001 ? (
                         !isLoading ? (
                             <div>
                                 <Pool />
@@ -25,7 +25,7 @@ export default function Pools(): JSX.Element {
                             <div>Loading....</div>
                         )
                     ) : (
-                        <div>Plz Connect to Rinkeby testnet</div>
+                        <div>Plz Connect to Mumbai testnet</div>
                     )}
                 </div>
             ) : (

@@ -12,7 +12,7 @@ export default function Home(): JSX.Element {
         <div>
             {isWeb3Enabled ? (
                 <div>
-                    {parseInt(chainId!) != 4 ? (
+                    {parseInt(chainId!) === 80001 ? (
                         !isFetching ? (
                             <div>
                                 <Swap />
