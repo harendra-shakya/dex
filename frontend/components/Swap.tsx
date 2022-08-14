@@ -7,6 +7,8 @@ import routerAbi from "../constants/Router.json";
 import factoryAbi from "../constants/Factory.json";
 import poolAbi from "../constants/Pool.json";
 import { OptionProps } from "@web3uikit/core";
+import { BigNumber } from "@ethersproject/bignumber";
+import tokenAbi from "../constants/Token.json";
 
 export default function Swap(): JSX.Element {
     const { isWeb3Enabled, account, chainId } = useMoralis();
@@ -31,9 +33,14 @@ export default function Swap(): JSX.Element {
         setOptionProps(_data);
     }
 
+    // useEffect(() => {
+    //     updateUI();
+    // }, [isWeb3Enabled]);
+
     useEffect(() => {
+        updateAmount2();
         updateUI();
-    }, [isWeb3Enabled]);
+    }, [amount1, amount2, isWeb3Enabled, token1, token2]);
 
     async function getPoolAddress(
         factory: Contract,
@@ -63,22 +70,27 @@ export default function Swap(): JSX.Element {
             path.pop();
             console.log("building path");
             const allPairs = await factory.getAllPairs();
-            console.log("allPairs", allPairs);
             if (allPairs.length === 0) throw "No pair exists";
 
-            allPairs.forEach(async (pair: string[2], i: number) => {
+            // console.log("tokenIn", tokenIn);
+            // console.log("tokenOut", tokenOut);
+
+            for (let pair of allPairs) {
                 let _token1 = tokenIn;
                 let _token2 = tokenOut;
                 if (pair.includes(_token2) && !pair.includes(_token1)) {
                     let token: string;
                     if (pair[0] === _token2) token = pair[1];
                     else token = pair[0];
-                    if ((await getPoolAddress(factory, _token1, token)) !== address0)
+                    // console.log("thord", token);
+                    // console.log("out", _token2);
+                    // console.log((await getPoolAddress(factory, _token2, token)) !== address0);
+                    if ((await getPoolAddress(factory, _token2, token)) !== address0)
                         path.push(token);
                 }
                 _token1 = pair[0];
                 _token2 = pair[1];
-            });
+            }
 
             path.push(tokenOut);
             return path;
@@ -89,12 +101,12 @@ export default function Swap(): JSX.Element {
         }
     }
 
-    useEffect(() => {
-        updateAmount2();
-    }, [amount1]);
-
     const updateAmount2 = async () => {
         try {
+            if (token1 === token2) {
+                setAmount2("Why are you swaping same token kid?");
+                return;
+            }
             setSwapDisabled(true);
             const { ethereum } = window;
             const provider = await new ethers.providers.Web3Provider(ethereum!);
@@ -114,22 +126,30 @@ export default function Swap(): JSX.Element {
             const token1Addr: string = contractAddresses[_chainId][_token1][0];
             const token2Addr: string = contractAddresses[_chainId][_token2][0];
 
+            let amountOut: BigNumber;
+            let pool: Contract;
+            let poolAddr: string;
+
             const path: string[] = await getPath(factory, token1Addr, token2Addr);
-            for(let i = 0; i < path.length; i++){
-                const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
-                const amountOut = await pool.getAmountOut(
-                token1Addr,
-                ethers.utils.parseEther(amount1)
-            );
+            console.log(path);
+            amountOut = ethers.utils.parseEther(amount1);
+            for (let i = 0; i < path.length - 1; i++) {
+                poolAddr = await getPoolAddress(factory, path[i], path[i + 1]);
+                pool = await new ethers.Contract(poolAddr, poolAbi, signer);
+                if (poolAddr === address0) {
+                    setSwapDisabled(false);
+                    setAmount2("Token not available :(");
+                    throw "error: This pool not exists";
+                }
+                amountOut = await pool.getAmountOut(path[i], amountOut);
+                console.log("see here....");
+                console.log("path", path[i], path[i + 1]);
+                console.log("pool", poolAddr);
+                console.log("amount out", ethers.utils.formatEther(amountOut), "i", i);
+                console.log("see here....");
             }
 
-            if (poolAddr === address0) {
-                setSwapDisabled(false);
-                throw "error: This pool not exists";
-            }
-            
-
-            setAmount2(ethers.utils.formatEther(amountOut));
+            setAmount2(ethers.utils.formatEther(amountOut!));
             setSwapDisabled(false);
         } catch (e) {
             console.log(e);
@@ -163,10 +183,22 @@ export default function Swap(): JSX.Element {
 
             const path: string[] = await getPath(factory, token1Addr, token2Addr);
             console.log("path", path);
+            const token1Contract = await new ethers.Contract(token1Addr, tokenAbi, signer);
+            const _amount1 = ethers.utils.parseEther(amount1);
+
+            let tx = await token1Contract.approve(routerAddress, _amount1);
+            let txReceipt = await tx.wait(1);
+
+            if (txReceipt.status === 1) {
+                console.log("Approved!");
+            } else {
+                alert("tx not appeoved!");
+                return;
+            }
 
             const router = await new ethers.Contract(routerAddress, routerAbi, signer);
-            const tx = await router._swap(amount1, path, account);
-            const txReceipt = await tx.wait();
+            tx = await router._swap(_amount1, path, account);
+            txReceipt = await tx.wait();
 
             if (txReceipt.status === 1) {
                 console.log("Swaped!");
@@ -185,7 +217,7 @@ export default function Swap(): JSX.Element {
             type: "success",
             title: "Token Swaped!",
             message: "Damnnn I am so cool",
-            position: "topR",
+            position: "topL",
         });
     };
 
@@ -197,7 +229,7 @@ export default function Swap(): JSX.Element {
                     name="Token1"
                     type="text"
                     onChange={(e) => {
-                        if (e.target.value !== "" && +e.target.value <= 0) return;
+                        if (e.target.value === "" || +e.target.value <= 0) return;
                         setTimeout(() => {
                             setAmount1(e.target.value);
                             updateAmount2();
@@ -243,7 +275,12 @@ export default function Swap(): JSX.Element {
                         isLoading={swapDisabled}
                         theme="primary"
                         size="large"
-                        disabled={swapDisabled}
+                        disabled={
+                            amount2 === "Token not available :(" ||
+                            "Why are you swaping same token kid?"
+                                ? true
+                                : swapDisabled
+                        }
                     />
                 </div>
             </div>

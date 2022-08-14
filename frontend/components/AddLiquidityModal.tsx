@@ -25,6 +25,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
     const [token2Supply, setToken2Supply] = useState("");
     const [token2, setToken2] = useState("DAI");
     const [fee, setFee] = useState("0.3");
+    const [input2Disabled, setInput2Disabled] = useState(true);
     const dispatch = useNotification();
 
     const allTokens = ["WETH", "WBTC", "DAI", "USDC"];
@@ -39,6 +40,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
         });
         setOptionProps(_data);
         showTokenSupply();
+        updateAmount2();
     }
 
     async function addLiquidity() {
@@ -98,16 +100,59 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
             type: "success",
             title: "Liquidity added!",
             message: "Liquidity added - Please Refresh",
-            position: "topR",
+            position: "topL",
         });
     };
 
-    const updateAmount1 = async () => {
-        // setAmount1("100");
-    };
-
     const updateAmount2 = async () => {
-        // setAmount2("200");
+        try {
+            setInput2Disabled(true);
+            if (token1 === token2) {
+                setAmount2("Why are you adding same token kid?");
+                return;
+            }
+            setIsOkDisabled(true);
+            const { ethereum } = window;
+            const provider = await new ethers.providers.Web3Provider(ethereum!);
+            const address0 = "0x0000000000000000000000000000000000000000";
+            const signer = provider.getSigner();
+            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
+            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
+            const factory: Contract = await new ethers.Contract(
+                factoryAddress,
+                factoryAbi,
+                signer
+            );
+
+            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
+            const _token1: Token = token1 as Token;
+            const _token2: Token = token2 as Token;
+            const token1Addr: string = contractAddresses[_chainId][_token1][0];
+            const token2Addr: string = contractAddresses[_chainId][_token2][0];
+
+            const _fee = parseFloat(fee) * 100;
+            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
+
+            if (poolAddr === address0) {
+                setIsOkDisabled(false);
+                setInput2Disabled(false);
+                setAmount2("0");
+                return;
+            }
+
+            const pool = await new ethers.Contract(poolAddr, poolAbi, signer);
+
+            const amountOut = await pool.getAmountOut(
+                token1Addr,
+                ethers.utils.parseEther(amount1)
+            );
+
+            setAmount2(ethers.utils.formatEther(amountOut!));
+            setIsOkDisabled(false);
+        } catch (e) {
+            setIsOkDisabled(false);
+            console.log(e);
+        }
     };
 
     const showTokenSupply = async () => {
@@ -134,7 +179,11 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
             const token2Addr: string = contractAddresses[_chainId][_token2][0];
 
             const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
-            if (poolAddr === address0) return;
+            if (poolAddr === address0) {
+                setToken1Supply("0");
+                setToken2Supply("0");
+                return;
+            }
 
             const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
             const reserves = await pool.getReserves();
@@ -142,7 +191,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
             console.log("resrves1", ethers.utils.formatEther(reserves._reserve1));
             console.log("resrves2", ethers.utils.formatEther(reserves._reserve2));
 
-            console.log("tokens.token1", tokens.token1);
+            console.log("tokens.token1", tokens._token1);
             console.log("token1", token1);
 
             if (tokens._token1 === token1Addr) {
@@ -159,7 +208,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
 
     useEffect(() => {
         updateUI();
-    }, [isWeb3Enabled, token1Supply]);
+    }, [isWeb3Enabled, token1, token2, amount1, fee]);
 
     return (
         <div className="pt-2">
@@ -171,7 +220,9 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                 title={`Add Liquidity`}
                 width="450px"
                 isCentered={true}
-                isOkDisabled={isOkDisabled}
+                isOkDisabled={
+                    amount2 === "Why are you adding same token kid?" ? true : isOkDisabled
+                }
             >
                 <div className=" grid grid-cols-1 gap-3 place-content-center h-35">
                     <div className="grid grid-cols-2 gap-3 place-content-stretch h-35">
@@ -179,9 +230,12 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                             label="Amount"
                             name="Amount"
                             type="text"
-                            onChange={async (e) => {
-                                setAmount1(e.target.value);
-                                updateAmount2();
+                            onChange={(e) => {
+                                if (e.target.value === "" || +e.target.value <= 0) return;
+                                setTimeout(() => {
+                                    setAmount1(e.target.value);
+                                    updateAmount2();
+                                }, 1000);
                             }}
                             value={amount1}
                             disabled={isOkDisabled}
@@ -200,11 +254,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                                 label="Amount"
                                 name="Amount"
                                 type="text"
-                                onChange={(e) => {
-                                    setAmount2(e.target.value);
-                                    updateAmount1();
-                                }}
-                                disabled={isOkDisabled}
+                                disabled={input2Disabled}
                                 value={amount2}
                             />
                         </div>
@@ -244,12 +294,15 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                             />
                         </div>
                     </div>
-                    <div className="pl-4">{`Total ${token1} Supply    - ${(+token1Supply).toFixed(
+                    <div className="pl-4">{`Total ${token1} Liquidity - ${(+token1Supply).toFixed(
                         2
                     )}`}</div>
-                    <div className="pl-4">{`Total ${token2} Supply    - ${(+token2Supply).toFixed(
+                    <div className="pl-4">{`Total ${token2} Liquidity - ${(+token2Supply).toFixed(
                         2
                     )}`}</div>
+                    <div className="pl-4">{`Your ${token1} Liquidity - 0`}</div>
+                    <div className="pl-4">{`Your ${token2} Liquidity - 0`}</div>{" "}
+                    {/* TODO: make this */}
                 </div>
 
                 <div className="pb-8"></div>
