@@ -9,6 +9,7 @@ import routerAbi from "../constants/Router.json";
 import factoryAbi from "../constants/Factory.json";
 import { OptionProps } from "@web3uikit/core";
 import tokenNames from "../constants/helper.json";
+import poolAbi from "../constants/Pool.json";
 
 export default function Pool(): JSX.Element {
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -17,7 +18,7 @@ export default function Pool(): JSX.Element {
     const [showModal, setShowModal] = useState<boolean>(false);
     const [existingPools, setExistingPools] = useState<string[]>();
 
-    console.log("data", data);
+    // console.log("data", data);
 
     async function getPoolAddress(
         factory: Contract,
@@ -55,7 +56,21 @@ export default function Pool(): JSX.Element {
         };
     }
 
+    async function getTVL(poolAddr: string) {
+        const { ethereum } = window;
+        const provider = await new ethers.providers.Web3Provider(ethereum!);
+        const signer = provider.getSigner();
+        const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
+        const reserves = await pool.getReserves();
+        const r1 = ethers.utils.formatEther(reserves._reserve1);
+        const r2 = ethers.utils.formatEther(reserves._reserve2);
+        const tvl = +(+r1 + +r2);
+        // console.log("r1 + r2", (tvl / 10 ** 6).toFixed(2));
+        return (tvl / 10 ** 6).toFixed(2);
+    }
+
     const showTable = async () => {
+        setIsLoading(true);
         const { ethereum } = window;
         const provider = await new ethers.providers.Web3Provider(ethereum!);
         const signer = provider.getSigner();
@@ -69,7 +84,7 @@ export default function Pool(): JSX.Element {
         const tokens: string = _tokens as string;
 
         const allPairs = await factory.getAllPairs();
-        console.log("allPairs", allPairs);
+        // console.log("allPairs", allPairs);
         if (allPairs.length === 0) throw "No pool exists";
 
         const _data: (string | JSX.Element)[][] = [];
@@ -87,11 +102,13 @@ export default function Pool(): JSX.Element {
                 _existingPools.push(poolObj.pool);
                 setExistingPools(_existingPools);
                 const token1: string = tokens[_chainId][pair[0]] as string;
-                console.log(console.log("token1", token1));
+                // console.log(console.log("token1", token1));
                 const _fee: string = await poolObj.fee;
 
+                const tvl = await getTVL(poolObj.pool);
+
                 const token2: string = tokens[_chainId][pair[1]] as string;
-                console.log(console.log("token2", token2));
+                // console.log(console.log("token2", token2));
 
                 _data.push([
                     <Image src={`/${token1.toLowerCase()}.svg`} width={40} height={40} />,
@@ -105,9 +122,9 @@ export default function Pool(): JSX.Element {
                         {token1}/{token2}
                     </div>,
                     `${_fee}`,
-                    "10000 B",
-                    "1 B",
-                    "10 B",
+                    `${tvl} M`,
+                    `20 M`,
+                    `200 M`,
                     <Button
                         onClick={() => {
                             setShowModal(true);
@@ -120,35 +137,8 @@ export default function Pool(): JSX.Element {
         }
 
         setData(_data);
+        setIsLoading(false);
     };
-
-    // const showTable = async () => {
-    //     const _data: (string | JSX.Element)[][] = [];
-    //     _data.push([
-    //         <Image src="/usdc.svg" width={40} height={40} />,
-    //         <Image src="/dai.svg" width={40} height={40} />,
-    //         <div
-    //             className="opacity-100 hover:opacity-60"
-    //             onClick={() => {
-    //                 console.log("yes");
-    //             }}
-    //         >
-    //             USDC/DAI
-    //         </div>,
-    //         "0.01%",
-    //         "10000 B",
-    //         "1 B",
-    //         "10 B",
-    //         <Button
-    //             onClick={() => {
-    //                 setShowModal(true);
-    //             }}
-    //             text="Add Liquidity"
-    //             theme="primary"
-    //         />,
-    //     ]);
-    //     setData(_data);
-    // };
 
     async function updateUI() {
         await showTable();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { Modal, useNotification, Input, Select, Button } from "@web3uikit/core";
 import { useMoralis } from "react-moralis";
 import { ethers, Contract, ContractInterface } from "ethers";
@@ -10,12 +10,8 @@ import { OptionProps } from "@web3uikit/core";
 
 export default function Swap(): JSX.Element {
     const { isWeb3Enabled, account, chainId } = useMoralis();
-    const [isOkDisabled, setIsOkDisabled] = useState(false);
-    const [choosed1, setChoosed1] = useState(false);
-    const [choosed2, setChoosed2] = useState(false);
-
-    const [amount1, setAmount1] = useState("");
-    const [amount2, setAmount2] = useState("");
+    const [amount1, setAmount1] = useState<string>("0");
+    const [amount2, setAmount2] = useState<string>("0");
     const [token1, setToken1] = useState("WETH");
     const [token2, setToken2] = useState("DAI");
     const [swapDisabled, setSwapDisabled] = useState(false);
@@ -32,7 +28,6 @@ export default function Swap(): JSX.Element {
                 label: token,
             });
         });
-        console.log("OptionProps", _data);
         setOptionProps(_data);
     }
 
@@ -94,11 +89,16 @@ export default function Swap(): JSX.Element {
         }
     }
 
-    const updateInput1 = async () => {
+    useEffect(() => {
+        updateAmount2();
+    }, [amount1]);
+
+    const updateAmount2 = async () => {
         try {
             setSwapDisabled(true);
             const { ethereum } = window;
             const provider = await new ethers.providers.Web3Provider(ethereum!);
+            const address0 = "0x0000000000000000000000000000000000000000";
             const signer = provider.getSigner();
             const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
             const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
@@ -114,43 +114,21 @@ export default function Swap(): JSX.Element {
             const token1Addr: string = contractAddresses[_chainId][_token1][0];
             const token2Addr: string = contractAddresses[_chainId][_token2][0];
 
-            const poolAddr = await getPoolAddress(factory, token1Addr, token2Addr);
-            const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
-            const amountOut = await pool.getAmountOut(
-                token2Addr,
-                ethers.utils.parseEther(amount2)
-            );
-            setAmount1(ethers.utils.formatEther(amountOut));
-            setSwapDisabled(false);
-        } catch (e) {}
-    };
-
-    const updateInput2 = async () => {
-        try {
-            setSwapDisabled(true);
-            const { ethereum } = window;
-            const provider = await new ethers.providers.Web3Provider(ethereum!);
-            const signer = provider.getSigner();
-            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
-            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
-            const factory: Contract = await new ethers.Contract(
-                factoryAddress,
-                factoryAbi,
-                signer
-            );
-
-            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
-            const _token1: Token = token1 as Token;
-            const _token2: Token = token2 as Token;
-            const token1Addr: string = contractAddresses[_chainId][_token1][0];
-            const token2Addr: string = contractAddresses[_chainId][_token2][0];
-
-            const poolAddr = await getPoolAddress(factory, token1Addr, token2Addr);
-            const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
-            const amountOut = await pool.getAmountOut(
+            const path: string[] = await getPath(factory, token1Addr, token2Addr);
+            for(let i = 0; i < path.length; i++){
+                const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
+                const amountOut = await pool.getAmountOut(
                 token1Addr,
                 ethers.utils.parseEther(amount1)
             );
+            }
+
+            if (poolAddr === address0) {
+                setSwapDisabled(false);
+                throw "error: This pool not exists";
+            }
+            
+
             setAmount2(ethers.utils.formatEther(amountOut));
             setSwapDisabled(false);
         } catch (e) {
@@ -168,10 +146,8 @@ export default function Swap(): JSX.Element {
 
             const routerAddress: string = contractAddresses[_chainId]["Router"][0];
             const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
-
             const address0 = "0x0000000000000000000000000000000000000000";
 
-            // const _factoryAbi: ContractInterface = factoryAbi as ContractInterface;
             const factory: Contract = await new ethers.Contract(
                 factoryAddress,
                 factoryAbi,
@@ -179,17 +155,14 @@ export default function Swap(): JSX.Element {
             );
 
             type Token = "WETH" | "DAI" | "WBTC" | "USDC";
-
             const _token1: Token = token1 as Token;
             const _token2: Token = token2 as Token;
 
             const token1Addr: string = contractAddresses[_chainId][_token1][0];
             const token2Addr: string = contractAddresses[_chainId][_token2][0];
 
-            let path: string[] = await getPath(factory, token1Addr, token2Addr); // 0.3%
+            const path: string[] = await getPath(factory, token1Addr, token2Addr);
             console.log("path", path);
-            // console.log(pool);
-            // console.log("lets go");
 
             const router = await new ethers.Contract(routerAddress, routerAbi, signer);
             const tx = await router._swap(amount1, path, account);
@@ -223,31 +196,33 @@ export default function Swap(): JSX.Element {
                     label="Token1"
                     name="Token1"
                     type="text"
-                    onChange={async (e) => {
-                        setAmount1(e.target.value);
-                        updateInput2();
+                    onChange={(e) => {
+                        if (e.target.value !== "" && +e.target.value <= 0) return;
+                        setTimeout(() => {
+                            setAmount1(e.target.value);
+                            updateAmount2();
+                        }, 1000);
                     }}
+                    disabled={swapDisabled}
                     value={amount1}
                 />
                 <Select
                     defaultOptionIndex={0}
                     label="Token"
                     onChange={async (OptionProps) => {
-                        setChoosed1(true);
                         setToken1(OptionProps.label.toString());
                     }}
                     options={OptionProps}
+                    disabled={swapDisabled}
                 />
                 <div className="pt-6">
                     <Input
                         label="Token2"
                         name="Token2"
                         type="text"
-                        onChange={(e) => {
-                            setAmount2(e.target.value);
-                            updateInput1();
-                        }}
+                        // onChange={(e) => {}}
                         value={amount2}
+                        disabled={true}
                     />
                 </div>
                 <div className="pt-6">
@@ -255,16 +230,17 @@ export default function Swap(): JSX.Element {
                         defaultOptionIndex={2}
                         label="Token"
                         onChange={(OptionProps) => {
-                            setChoosed2(true);
                             setToken2(OptionProps.label.toString());
                         }}
                         options={OptionProps}
+                        disabled={swapDisabled}
                     />
                 </div>
                 <div className="pt-6 pl-48">
                     <Button
                         onClick={swap}
-                        text={swapDisabled ? "fetching.." : "Swap"}
+                        text={"Swap"}
+                        isLoading={swapDisabled}
                         theme="primary"
                         size="large"
                         disabled={swapDisabled}

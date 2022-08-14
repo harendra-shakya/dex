@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Modal, useNotification, Input, Select } from "@web3uikit/core";
 import { useMoralis } from "react-moralis";
-import { ethers } from "ethers";
+import { ethers, Contract } from "ethers";
 import { OptionProps } from "@web3uikit/core";
 import contractAddresses from "../constants/networkMapping.json";
 import routerAbi from "../constants/Router.json";
 import tokenAbi from "../constants/Token.json";
+import poolAbi from "../constants/Pool.json";
+import factoryAbi from "../constants/Factory.json";
 
 type AddLiquidityModalProps = {
     isVisible: boolean;
@@ -19,6 +21,8 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
     const [amount2, setAmount2] = useState("");
     const [OptionProps, setOptionProps] = useState<OptionProps[]>();
     const [token1, setToken1] = useState("WETH");
+    const [token1Supply, setToken1Supply] = useState("");
+    const [token2Supply, setToken2Supply] = useState("");
     const [token2, setToken2] = useState("DAI");
     const [fee, setFee] = useState("0.3");
     const dispatch = useNotification();
@@ -34,11 +38,8 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
             });
         });
         setOptionProps(_data);
+        showTokenSupply();
     }
-
-    useEffect(() => {
-        updateUI();
-    }, [isWeb3Enabled]);
 
     async function addLiquidity() {
         try {
@@ -109,9 +110,56 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
         // setAmount2("200");
     };
 
+    const showTokenSupply = async () => {
+        try {
+            const { ethereum } = window;
+            const provider = await new ethers.providers.Web3Provider(ethereum!);
+            const signer = provider.getSigner();
+            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
+            const _fee = parseFloat(fee) * 100;
+
+            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
+            const factory: Contract = await new ethers.Contract(
+                factoryAddress,
+                factoryAbi,
+                signer
+            );
+            const address0 = "0x0000000000000000000000000000000000000000";
+            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
+
+            const _token1: Token = token1 as Token;
+            const _token2: Token = token2 as Token;
+
+            const token1Addr: string = contractAddresses[_chainId][_token1][0];
+            const token2Addr: string = contractAddresses[_chainId][_token2][0];
+
+            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
+            if (poolAddr === address0) return;
+
+            const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
+            const reserves = await pool.getReserves();
+            const tokens = await pool.getTokens();
+            console.log("resrves1", ethers.utils.formatEther(reserves._reserve1));
+            console.log("resrves2", ethers.utils.formatEther(reserves._reserve2));
+
+            console.log("tokens.token1", tokens.token1);
+            console.log("token1", token1);
+
+            if (tokens._token1 === token1Addr) {
+                setToken1Supply(ethers.utils.formatEther(reserves._reserve1));
+                setToken2Supply(ethers.utils.formatEther(reserves._reserve2));
+            } else {
+                setToken1Supply(ethers.utils.formatEther(reserves._reserve2));
+                setToken2Supply(ethers.utils.formatEther(reserves._reserve1));
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    };
+
     useEffect(() => {
         updateUI();
-    }, [isWeb3Enabled]);
+    }, [isWeb3Enabled, token1Supply]);
 
     return (
         <div className="pt-2">
@@ -162,7 +210,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                         </div>
                         <div className="pt-6">
                             <Select
-                                defaultOptionIndex={1}
+                                defaultOptionIndex={2}
                                 label="Token"
                                 onChange={(OptionProps) => {
                                     setToken2(OptionProps.label.toString());
@@ -196,9 +244,15 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                             />
                         </div>
                     </div>
+                    <div className="pl-4">{`Total ${token1} Supply    - ${(+token1Supply).toFixed(
+                        2
+                    )}`}</div>
+                    <div className="pl-4">{`Total ${token2} Supply    - ${(+token2Supply).toFixed(
+                        2
+                    )}`}</div>
                 </div>
 
-                <div className="pb-12"></div>
+                <div className="pb-8"></div>
             </Modal>
         </div>
     );
