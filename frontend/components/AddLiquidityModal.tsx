@@ -19,6 +19,8 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
     const [isOkDisabled, setIsOkDisabled] = useState(false);
     const [amount1, setAmount1] = useState("");
     const [amount2, setAmount2] = useState("");
+    const [token1Liquidity, setToken1Liquidity] = useState(0);
+    const [token2Liquidity, setToken2Liquidity] = useState(0);
     const [OptionProps, setOptionProps] = useState<OptionProps[]>();
     const [token1, setToken1] = useState("WETH");
     const [token1Supply, setToken1Supply] = useState("");
@@ -30,7 +32,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
 
     const allTokens = ["WETH", "WBTC", "DAI", "USDC"];
 
-    async function updateUI() {
+    const updateOptions = async () => {
         let _data: OptionProps[] = [];
         allTokens.forEach(async (token, i) => {
             _data.push({
@@ -39,9 +41,121 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
             });
         });
         setOptionProps(_data);
-        showTokenSupply();
-        updateAmount2();
-    }
+    };
+
+    const updateAmount2 = async () => {
+        try {
+            setInput2Disabled(true);
+            if (token1 === token2) {
+                setAmount2("Why are you adding same token kid?");
+                return;
+            }
+            setIsOkDisabled(true);
+            const { ethereum } = window;
+            const provider = await new ethers.providers.Web3Provider(ethereum!);
+            const address0 = "0x0000000000000000000000000000000000000000";
+            const signer = provider.getSigner();
+            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
+            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
+            const factory: Contract = await new ethers.Contract(
+                factoryAddress,
+                factoryAbi,
+                signer
+            );
+
+            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
+            const _token1: Token = token1 as Token;
+            const _token2: Token = token2 as Token;
+            const token1Addr: string = contractAddresses[_chainId][_token1][0];
+            const token2Addr: string = contractAddresses[_chainId][_token2][0];
+
+            const _fee = parseFloat(fee) * 100;
+            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
+
+            if (poolAddr === address0) {
+                setIsOkDisabled(false);
+                setInput2Disabled(false);
+                return;
+            }
+
+            const pool = await new ethers.Contract(poolAddr, poolAbi, signer);
+
+            const amountOut = await pool.getAmountOut(
+                token1Addr,
+                ethers.utils.parseEther(amount1)
+            );
+
+            setAmount2(ethers.utils.formatEther(amountOut!));
+            setIsOkDisabled(false);
+        } catch (e) {
+            setIsOkDisabled(false);
+            console.log(e);
+        }
+    };
+
+    const showTokenSupply = async () => {
+        try {
+            const { ethereum } = window;
+            const provider = await new ethers.providers.Web3Provider(ethereum!);
+            const signer = provider.getSigner();
+            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
+            const _fee = parseFloat(fee) * 100;
+
+            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
+            const factory: Contract = await new ethers.Contract(
+                factoryAddress,
+                factoryAbi,
+                signer
+            );
+            const address0 = "0x0000000000000000000000000000000000000000";
+            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
+
+            const _token1: Token = token1 as Token;
+            const _token2: Token = token2 as Token;
+
+            const token1Addr: string = contractAddresses[_chainId][_token1][0];
+            const token2Addr: string = contractAddresses[_chainId][_token2][0];
+
+            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
+            if (poolAddr === address0) {
+                setToken1Liquidity(0);
+                setToken2Liquidity(0);
+                setToken1Supply("0");
+                setToken2Supply("0");
+                return;
+            }
+
+            const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
+            const reserves = await pool.getReserves();
+            const tokens = await pool.getTokens();
+            const totalSupply = ethers.utils.formatEther(await pool.totalSupply());
+            const _liquidity = await pool.balanceOf(account);
+            let liquidity: string;
+
+            if (+_liquidity) {
+                liquidity = ethers.utils.formatEther(_liquidity);
+            } else {
+                liquidity = "0";
+            }
+
+            const reserve1 = ethers.utils.formatEther(reserves._reserve1);
+            const reserve2 = ethers.utils.formatEther(reserves._reserve2);
+
+            if (tokens._token1 === token1Addr) {
+                setToken1Liquidity((+reserve1 * +liquidity) / +totalSupply);
+                setToken2Liquidity((+reserve2 * +liquidity) / +totalSupply);
+                setToken1Supply(reserve1);
+                setToken2Supply(reserve2);
+            } else {
+                setToken1Liquidity((+reserve2 * +liquidity) / +totalSupply);
+                setToken2Liquidity((+reserve1 * +liquidity) / +totalSupply);
+                setToken1Supply(reserve2);
+                setToken2Supply(reserve1);
+            }
+        } catch (e) {
+            console.log(e);
+        }
+    };
 
     async function addLiquidity() {
         try {
@@ -90,7 +204,7 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
         } catch (e) {
             console.log(e);
             setIsOkDisabled(true);
-            console.log("this error is coming from add liquidity");
+            console.log("this error is coming from add liquidity function");
         }
     }
 
@@ -104,111 +218,15 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
         });
     };
 
-    const updateAmount2 = async () => {
-        try {
-            setInput2Disabled(true);
-            if (token1 === token2) {
-                setAmount2("Why are you adding same token kid?");
-                return;
-            }
-            setIsOkDisabled(true);
-            const { ethereum } = window;
-            const provider = await new ethers.providers.Web3Provider(ethereum!);
-            const address0 = "0x0000000000000000000000000000000000000000";
-            const signer = provider.getSigner();
-            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
-            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
-            const factory: Contract = await new ethers.Contract(
-                factoryAddress,
-                factoryAbi,
-                signer
-            );
-
-            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
-            const _token1: Token = token1 as Token;
-            const _token2: Token = token2 as Token;
-            const token1Addr: string = contractAddresses[_chainId][_token1][0];
-            const token2Addr: string = contractAddresses[_chainId][_token2][0];
-
-            const _fee = parseFloat(fee) * 100;
-            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
-
-            if (poolAddr === address0) {
-                setIsOkDisabled(false);
-                setInput2Disabled(false);
-                setAmount2("0");
-                return;
-            }
-
-            const pool = await new ethers.Contract(poolAddr, poolAbi, signer);
-
-            const amountOut = await pool.getAmountOut(
-                token1Addr,
-                ethers.utils.parseEther(amount1)
-            );
-
-            setAmount2(ethers.utils.formatEther(amountOut!));
-            setIsOkDisabled(false);
-        } catch (e) {
-            setIsOkDisabled(false);
-            console.log(e);
-        }
-    };
-
-    const showTokenSupply = async () => {
-        try {
-            const { ethereum } = window;
-            const provider = await new ethers.providers.Web3Provider(ethereum!);
-            const signer = provider.getSigner();
-            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
-            const _fee = parseFloat(fee) * 100;
-
-            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
-            const factory: Contract = await new ethers.Contract(
-                factoryAddress,
-                factoryAbi,
-                signer
-            );
-            const address0 = "0x0000000000000000000000000000000000000000";
-            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
-
-            const _token1: Token = token1 as Token;
-            const _token2: Token = token2 as Token;
-
-            const token1Addr: string = contractAddresses[_chainId][_token1][0];
-            const token2Addr: string = contractAddresses[_chainId][_token2][0];
-
-            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
-            if (poolAddr === address0) {
-                setToken1Supply("0");
-                setToken2Supply("0");
-                return;
-            }
-
-            const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
-            const reserves = await pool.getReserves();
-            const tokens = await pool.getTokens();
-            console.log("resrves1", ethers.utils.formatEther(reserves._reserve1));
-            console.log("resrves2", ethers.utils.formatEther(reserves._reserve2));
-
-            console.log("tokens.token1", tokens._token1);
-            console.log("token1", token1);
-
-            if (tokens._token1 === token1Addr) {
-                setToken1Supply(ethers.utils.formatEther(reserves._reserve1));
-                setToken2Supply(ethers.utils.formatEther(reserves._reserve2));
-            } else {
-                setToken1Supply(ethers.utils.formatEther(reserves._reserve2));
-                setToken2Supply(ethers.utils.formatEther(reserves._reserve1));
-            }
-        } catch (e) {
-            console.log(e);
-        }
-    };
+    async function updateUI() {
+        await updateOptions();
+        await showTokenSupply();
+        await updateAmount2();
+    }
 
     useEffect(() => {
         updateUI();
-    }, [isWeb3Enabled, token1, token2, amount1, fee]);
+    }, [isWeb3Enabled, token1, token2, amount1, amount2, fee]);
 
     return (
         <div className="pt-2">
@@ -254,6 +272,12 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                                 label="Amount"
                                 name="Amount"
                                 type="text"
+                                onChange={(e) => {
+                                    if (e.target.value === "" || +e.target.value <= 0) return;
+                                    setTimeout(() => {
+                                        setAmount2(e.target.value);
+                                    }, 1000);
+                                }}
                                 disabled={input2Disabled}
                                 value={amount2}
                             />
@@ -300,9 +324,12 @@ export default function AddLiquidityModal({ isVisible, onClose }: AddLiquidityMo
                     <div className="pl-4">{`Total ${token2} Liquidity - ${(+token2Supply).toFixed(
                         2
                     )}`}</div>
-                    <div className="pl-4">{`Your ${token1} Liquidity - 0`}</div>
-                    <div className="pl-4">{`Your ${token2} Liquidity - 0`}</div>{" "}
-                    {/* TODO: make this */}
+                    <div className="pl-4">{`Your ${token1} Liquidity - ${token1Liquidity.toFixed(
+                        2
+                    )}`}</div>
+                    <div className="pl-4">{`Your ${token2} Liquidity - ${token2Liquidity.toFixed(
+                        2
+                    )}`}</div>
                 </div>
 
                 <div className="pb-8"></div>

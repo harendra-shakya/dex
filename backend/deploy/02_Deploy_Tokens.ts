@@ -1,7 +1,6 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { network } from "hardhat";
 import {
-    networkConfig,
     developmentChains,
     VERIFICATION_BLOCK_CONFIRMATIONS,
 } from "../helper-hardhat-config";
@@ -21,7 +20,7 @@ const deployFunction: DeployFunction = async ({ getNamedAccounts, deployments })
     log("-----------------------------------------------------------");
     log("deploying factory......");
 
-    const weth = await deploy("WETH", {
+    await deploy("WETH", {
         from: deployer,
         log: true,
         args: [],
@@ -31,7 +30,7 @@ const deployFunction: DeployFunction = async ({ getNamedAccounts, deployments })
     log("-----------------------------------------------------------");
     log("Deploying Router....");
 
-    const wbtc = await deploy("WBTC", {
+    await deploy("WBTC", {
         from: deployer,
         log: true,
         args: [],
@@ -41,14 +40,14 @@ const deployFunction: DeployFunction = async ({ getNamedAccounts, deployments })
     log("-----------------------------------------------------------");
     log("Deploying liquidity token....");
 
-    const usdc = await deploy("USDC", {
+    await deploy("USDC", {
         from: deployer,
         log: true,
         args: [],
         waitConfirmations: waitConfirmations,
     });
 
-    const dai = await deploy("DAI", {
+    await deploy("DAI", {
         from: deployer,
         log: true,
         args: [],

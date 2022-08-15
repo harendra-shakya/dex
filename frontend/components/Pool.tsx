@@ -10,15 +10,15 @@ import factoryAbi from "../constants/Factory.json";
 import { OptionProps } from "@web3uikit/core";
 import tokenNames from "../constants/helper.json";
 import poolAbi from "../constants/Pool.json";
+import RemoveLiquidityModal from "./RemoveLiquidityModal";
 
 export default function Pool(): JSX.Element {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const { isWeb3Enabled, chainId, account } = useMoralis();
     const [data, setData] = useState<(string | JSX.Element)[][]>([]);
-    const [showModal, setShowModal] = useState<boolean>(false);
+    const [showAddModal, setShowAddModal] = useState<boolean>(false);
+    const [showRemoveModal, setShowRemoveModal] = useState<boolean>(false);
     const [existingPools, setExistingPools] = useState<string[]>();
-
-    // console.log("data", data);
 
     async function getPoolAddress(
         factory: Contract,
@@ -47,12 +47,12 @@ export default function Pool(): JSX.Element {
         if (pool !== address0 && !existingPools?.includes(pool))
             return {
                 pool: pool,
-                fee: "0.1%",
+                fee: "1%",
             };
 
         return {
             pool: address0,
-            fee: "0.1%",
+            fee: "1%",
         };
     }
 
@@ -65,7 +65,6 @@ export default function Pool(): JSX.Element {
         const r1 = ethers.utils.formatEther(reserves._reserve1);
         const r2 = ethers.utils.formatEther(reserves._reserve2);
         const tvl = +(+r1 + +r2);
-        // console.log("r1 + r2", (tvl / 10 ** 6).toFixed(2));
         return (tvl / 10 ** 6).toFixed(2);
     }
 
@@ -76,7 +75,6 @@ export default function Pool(): JSX.Element {
         const signer = provider.getSigner();
         const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
 
-        const routerAddress: string = contractAddresses[_chainId]["Router"][0];
         const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
         const address0 = "0x0000000000000000000000000000000000000000";
         const factory: Contract = await new ethers.Contract(factoryAddress, factoryAbi, signer);
@@ -84,7 +82,6 @@ export default function Pool(): JSX.Element {
         const tokens: string = _tokens as string;
 
         const allPairs = await factory.getAllPairs();
-        // console.log("allPairs", allPairs);
         if (allPairs.length === 0) throw "No pool exists";
 
         const _data: (string | JSX.Element)[][] = [];
@@ -101,35 +98,32 @@ export default function Pool(): JSX.Element {
                 }
                 _existingPools.push(poolObj.pool);
                 setExistingPools(_existingPools);
+
                 const token1: string = tokens[_chainId][pair[0]] as string;
-                // console.log(console.log("token1", token1));
                 const _fee: string = await poolObj.fee;
-
                 const tvl = await getTVL(poolObj.pool);
-
                 const token2: string = tokens[_chainId][pair[1]] as string;
-                // console.log(console.log("token2", token2));
 
                 _data.push([
                     <Image src={`/${token1.toLowerCase()}.svg`} width={40} height={40} />,
                     <Image src={`/${token2.toLowerCase()}.svg`} width={40} height={40} />,
-                    <div
-                        className="opacity-100 hover:opacity-60"
-                        onClick={() => {
-                            console.log("yes");
-                        }}
-                    >
-                        {token1}/{token2}
-                    </div>,
+                    `${token1}/${token2}`,
                     `${_fee}`,
-                    `${tvl} M`,
-                    `20 M`,
-                    `200 M`,
+                    `${(+tvl).toFixed(2)} M`,
+                    `${(+tvl / 100).toFixed(2)} M`,
+                    `${(+tvl / 10).toFixed(2)} M`,
                     <Button
                         onClick={() => {
-                            setShowModal(true);
+                            setShowAddModal(true);
                         }}
                         text="Add Liquidity"
+                        theme="primary"
+                    />,
+                    <Button
+                        onClick={() => {
+                            setShowRemoveModal(true);
+                        }}
+                        text="Remove Liquidity"
                         theme="primary"
                     />,
                 ]);
@@ -152,7 +146,7 @@ export default function Pool(): JSX.Element {
         <div>
             <div className="p-8 pt-6 font-semibold text-3xl text-gray-500">Pools</div>
             <Table
-                columnsConfig="60px 35px 1fr 3fr 1fr 1fr 1fr 160px 30px"
+                columnsConfig="60px 35px 1fr 3fr 1fr 1fr 1fr 160px 200px"
                 data={data}
                 header={[
                     "",
@@ -163,22 +157,17 @@ export default function Pool(): JSX.Element {
                     <span>Volume 24H</span>,
                     <span>Volume 7D</span>,
                     "",
+                    "",
                 ]}
                 maxPages={1}
                 pageSize={8}
                 isLoading={isLoading}
             />
-            <AddLiquidityModal isVisible={showModal} onClose={() => setShowModal(false)} />
+            <AddLiquidityModal isVisible={showAddModal} onClose={() => setShowAddModal(false)} />
+            <RemoveLiquidityModal
+                isVisible={showRemoveModal}
+                onClose={() => setShowRemoveModal(false)}
+            />
         </div>
     );
 }
-
-/**
- * <Image src="/usdc.svg" width={40} height={40} />,
-            <Image src="/dai.svg" width={40} height={40} />,
-            "USDC/DAI",
-            "10000 B",
-            "1 B",
-            "10 B",
-            <Button onClick={function noRefCheck() {}} text="Add Liquidity" theme="primary" />,
- */

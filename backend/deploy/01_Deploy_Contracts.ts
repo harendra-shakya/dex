@@ -1,7 +1,6 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { network } from "hardhat";
 import {
-    networkConfig,
     developmentChains,
     VERIFICATION_BLOCK_CONFIRMATIONS,
 } from "../helper-hardhat-config";
@@ -41,17 +40,9 @@ const deployFunction: DeployFunction = async ({ getNamedAccounts, deployments })
     log("-----------------------------------------------------------");
     log("Deploying liquidity token....");
 
-    const token = await deploy("LiquidityToken", {
-        from: deployer,
-        log: true,
-        args: [],
-        waitConfirmations: waitConfirmations,
-    });
-
     if (!developmentChains.includes(network.name)) {
         await verify(factory.address, []);
         await verify(router.address, [factory.address]);
-        await verify(token.address, []);
     }
 };
 

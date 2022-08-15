@@ -22,7 +22,7 @@ export default function Swap(): JSX.Element {
 
     const allTokens = ["WETH", "WBTC", "DAI", "USDC"];
 
-    async function updateUI() {
+    async function updateOptions() {
         let _data: OptionProps[] = [];
         allTokens.forEach(async (token, i) => {
             _data.push({
@@ -33,12 +33,12 @@ export default function Swap(): JSX.Element {
         setOptionProps(_data);
     }
 
-    // useEffect(() => {
-    //     updateUI();
-    // }, [isWeb3Enabled]);
+    async function updateUI() {
+        await updateOptions();
+        await updateAmount2();
+    }
 
     useEffect(() => {
-        updateAmount2();
         updateUI();
     }, [amount1, amount2, isWeb3Enabled, token1, token2]);
 
@@ -65,26 +65,20 @@ export default function Swap(): JSX.Element {
         try {
             const path: string[] = [tokenIn, tokenOut];
             const address0 = "0x0000000000000000000000000000000000000000";
-            let pool = await getPoolAddress(factory, tokenIn, tokenOut); // 0.01%
+            let pool = await getPoolAddress(factory, tokenIn, tokenOut);
             if (pool !== address0) return path;
             path.pop();
             console.log("building path");
             const allPairs = await factory.getAllPairs();
             if (allPairs.length === 0) throw "No pair exists";
 
-            // console.log("tokenIn", tokenIn);
-            // console.log("tokenOut", tokenOut);
-
             for (let pair of allPairs) {
                 let _token1 = tokenIn;
                 let _token2 = tokenOut;
-                if (pair.includes(_token2) && !pair.includes(_token1)) {
+                if (pair.includes(_token2) && !pair.includes(_token1) && path.length < 2) {
                     let token: string;
                     if (pair[0] === _token2) token = pair[1];
                     else token = pair[0];
-                    // console.log("thord", token);
-                    // console.log("out", _token2);
-                    // console.log((await getPoolAddress(factory, _token2, token)) !== address0);
                     if ((await getPoolAddress(factory, _token2, token)) !== address0)
                         path.push(token);
                 }
@@ -93,6 +87,7 @@ export default function Swap(): JSX.Element {
             }
 
             path.push(tokenOut);
+            console.log("path");
             return path;
         } catch (e) {
             console.log(e);
@@ -225,22 +220,22 @@ export default function Swap(): JSX.Element {
         <div className="pt-48 pl-96 grid grid-cols-2 gap-3 place-content-center h-35">
             <div className="grid grid-cols-2 gap-3 place-content-stretch h-35">
                 <Input
-                    label="Token1"
-                    name="Token1"
+                    label="Amount"
+                    name="Amount"
                     type="text"
                     onChange={(e) => {
                         if (e.target.value === "" || +e.target.value <= 0) return;
                         setTimeout(() => {
                             setAmount1(e.target.value);
-                            updateAmount2();
                         }, 1000);
                     }}
+                    onBlur={updateUI}
                     disabled={swapDisabled}
                     value={amount1}
                 />
                 <Select
                     defaultOptionIndex={0}
-                    label="Token"
+                    label="From"
                     onChange={async (OptionProps) => {
                         setToken1(OptionProps.label.toString());
                     }}
@@ -249,10 +244,9 @@ export default function Swap(): JSX.Element {
                 />
                 <div className="pt-6">
                     <Input
-                        label="Token2"
-                        name="Token2"
+                        label="Amount"
+                        name="Amount"
                         type="text"
-                        // onChange={(e) => {}}
                         value={amount2}
                         disabled={true}
                     />
@@ -260,7 +254,7 @@ export default function Swap(): JSX.Element {
                 <div className="pt-6">
                     <Select
                         defaultOptionIndex={2}
-                        label="Token"
+                        label="To"
                         onChange={(OptionProps) => {
                             setToken2(OptionProps.label.toString());
                         }}
@@ -277,7 +271,7 @@ export default function Swap(): JSX.Element {
                         size="large"
                         disabled={
                             amount2 === "Token not available :(" ||
-                            "Why are you swaping same token kid?"
+                            amount2 === "Why are you swaping same token kid?"
                                 ? true
                                 : swapDisabled
                         }
