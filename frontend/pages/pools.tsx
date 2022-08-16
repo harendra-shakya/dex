@@ -8,10 +8,6 @@ export default function Pools(): JSX.Element {
     const [isLoading, setIsLoading] = useState(false);
     const { isWeb3Enabled, chainId, account } = useMoralis();
 
-    const showTable = async () => {};
-
-    useEffect(() => {}, []);
-
     return (
         <div>
             {isWeb3Enabled ? (

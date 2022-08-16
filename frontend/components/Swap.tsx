@@ -10,6 +10,8 @@ import { OptionProps } from "@web3uikit/core";
 import { BigNumber } from "@ethersproject/bignumber";
 import tokenAbi from "../constants/Token.json";
 
+declare var window: any;
+
 export default function Swap(): JSX.Element {
     const { isWeb3Enabled, account, chainId } = useMoralis();
     const [amount1, setAmount1] = useState<string>("0");
@@ -133,7 +135,6 @@ export default function Swap(): JSX.Element {
                     throw "error: This pool not exists";
                 }
                 amountOut = await pool.getAmountOut(path[i], amountOut);
-
             }
 
             setAmount2(ethers.utils.formatEther(amountOut!));

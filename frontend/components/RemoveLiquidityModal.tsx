@@ -9,6 +9,8 @@ import tokenAbi from "../constants/Token.json";
 import poolAbi from "../constants/Pool.json";
 import factoryAbi from "../constants/Factory.json";
 
+declare var window: any;
+
 type RemoveLiquidityModalProps = {
     isVisible: boolean;
     onClose: () => void;

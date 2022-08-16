@@ -11,6 +11,8 @@ import { OptionProps } from "@web3uikit/core";
 import tokenNames from "../constants/helper.json";
 import poolAbi from "../constants/Pool.json";
 import RemoveLiquidityModal from "./RemoveLiquidityModal";
+declare var window: any;
+
 
 export default function Pool(): JSX.Element {
     const [isLoading, setIsLoading] = useState<boolean>(false);
