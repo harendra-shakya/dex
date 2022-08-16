@@ -53,7 +53,6 @@ export default function Swap(): JSX.Element {
         pool = await factory.getPoolAddress(_token1, _token2, 30); // 0.3%
         if (pool !== address0) return pool;
         pool = await factory.getPoolAddress(_token1, _token2, 100); // 1%
-        console.log("pool", pool);
         return pool;
     }
 
@@ -68,7 +67,6 @@ export default function Swap(): JSX.Element {
             let pool = await getPoolAddress(factory, tokenIn, tokenOut);
             if (pool !== address0) return path;
             path.pop();
-            console.log("building path");
             const allPairs = await factory.getAllPairs();
             if (allPairs.length === 0) throw "No pair exists";
 
@@ -87,11 +85,10 @@ export default function Swap(): JSX.Element {
             }
 
             path.push(tokenOut);
-            console.log("path");
             return path;
         } catch (e) {
             console.log(e);
-            console.log("This error is coming from getPath");
+            console.log("This error is coming from getPath function");
             throw e;
         }
     }
@@ -126,7 +123,6 @@ export default function Swap(): JSX.Element {
             let poolAddr: string;
 
             const path: string[] = await getPath(factory, token1Addr, token2Addr);
-            console.log(path);
             amountOut = ethers.utils.parseEther(amount1);
             for (let i = 0; i < path.length - 1; i++) {
                 poolAddr = await getPoolAddress(factory, path[i], path[i + 1]);
@@ -137,11 +133,7 @@ export default function Swap(): JSX.Element {
                     throw "error: This pool not exists";
                 }
                 amountOut = await pool.getAmountOut(path[i], amountOut);
-                console.log("see here....");
-                console.log("path", path[i], path[i + 1]);
-                console.log("pool", poolAddr);
-                console.log("amount out", ethers.utils.formatEther(amountOut), "i", i);
-                console.log("see here....");
+
             }
 
             setAmount2(ethers.utils.formatEther(amountOut!));
@@ -177,7 +169,6 @@ export default function Swap(): JSX.Element {
             const token2Addr: string = contractAddresses[_chainId][_token2][0];
 
             const path: string[] = await getPath(factory, token1Addr, token2Addr);
-            console.log("path", path);
             const token1Contract = await new ethers.Contract(token1Addr, tokenAbi, signer);
             const _amount1 = ethers.utils.parseEther(amount1);
 

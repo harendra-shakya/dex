@@ -17,8 +17,6 @@ type RemoveLiquidityModalProps = {
 export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiquidityModalProps) {
     const { isWeb3Enabled, account, chainId } = useMoralis();
     const [isOkDisabled, setIsOkDisabled] = useState(false);
-    const [amount1, setAmount1] = useState("");
-    const [amount2, setAmount2] = useState("");
     const [token1Liquidity, setToken1Liquidity] = useState(0);
     const [token2Liquidity, setToken2Liquidity] = useState(0);
     const [OptionProps, setOptionProps] = useState<OptionProps[]>();
@@ -27,8 +25,9 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
     const [token2Supply, setToken2Supply] = useState("");
     const [token2, setToken2] = useState("DAI");
     const [fee, setFee] = useState("0.3");
-    const [input2Disabled, setInput2Disabled] = useState(true);
+    const [liquidity, setLiquidity] = useState("10%");
     const dispatch = useNotification();
+    const [info, setInfo] = useState("");
 
     const allTokens = ["WETH", "WBTC", "DAI", "USDC"];
 
@@ -43,59 +42,14 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
         setOptionProps(_data);
     }
 
-    const updateAmount2 = async () => {
-        try {
-            setInput2Disabled(true);
-            if (token1 === token2) {
-                setAmount2("Why are you choosing same token kid?");
-                return;
-            }
-            setIsOkDisabled(true);
-            const { ethereum } = window;
-            const provider = await new ethers.providers.Web3Provider(ethereum!);
-            const address0 = "0x0000000000000000000000000000000000000000";
-            const signer = provider.getSigner();
-            const _chainId: "80001" | "31337" = parseInt(chainId!).toString() as "80001" | "31337";
-            const factoryAddress: string = contractAddresses[_chainId]["Factory"][0];
-            const factory: Contract = await new ethers.Contract(
-                factoryAddress,
-                factoryAbi,
-                signer
-            );
-
-            type Token = "WETH" | "DAI" | "WBTC" | "USDC";
-            const _token1: Token = token1 as Token;
-            const _token2: Token = token2 as Token;
-            const token1Addr: string = contractAddresses[_chainId][_token1][0];
-            const token2Addr: string = contractAddresses[_chainId][_token2][0];
-
-            const _fee = parseFloat(fee) * 100;
-            const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
-
-            if (poolAddr === address0) {
-                setIsOkDisabled(false);
-                setAmount1("0");
-                setAmount2("No pool exists!");
-                return;
-            }
-
-            const pool = await new ethers.Contract(poolAddr, poolAbi, signer);
-
-            const amountOut = await pool.getAmountOut(
-                token1Addr,
-                ethers.utils.parseEther(amount1)
-            );
-
-            setAmount2(ethers.utils.formatEther(amountOut!));
-            setIsOkDisabled(false);
-        } catch (e) {
-            setIsOkDisabled(false);
-            console.log(e);
-        }
-    };
-
     const showTokenSupply = async () => {
         try {
+            setInfo("");
+            if (token1 === token2) {
+                setInfo("Info: Same token not allowed");
+                return;
+            }
+
             const { ethereum } = window;
             const provider = await new ethers.providers.Web3Provider(ethereum!);
             const signer = provider.getSigner();
@@ -123,6 +77,8 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
                 setToken2Liquidity(0);
                 setToken1Supply("0");
                 setToken2Supply("0");
+                setIsOkDisabled(false);
+                setInfo("Info: No pool exists!");
                 return;
             }
 
@@ -130,26 +86,31 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
             const reserves = await pool.getReserves();
             const tokens = await pool.getTokens();
             const totalSupply = ethers.utils.formatEther(await pool.totalSupply());
-            const _liquidity = await pool.balanceOf(account);
-            let liquidity: string;
+            const _liquidity: string = await pool.balanceOf(account);
+            let liquidityAmount: string;
 
             if (+_liquidity) {
-                liquidity = ethers.utils.formatEther(_liquidity);
+                liquidityAmount = ethers.utils.formatEther(_liquidity);
             } else {
-                liquidity = "0";
+                liquidityAmount = "0";
+                setInfo("Info: You don't have any liquidity");
             }
+
+            console.log("liq", +_liquidity);
 
             const reserve1 = ethers.utils.formatEther(reserves._reserve1);
             const reserve2 = ethers.utils.formatEther(reserves._reserve2);
+            const userLiquidity1 = (+reserve1 * +liquidityAmount) / +totalSupply;
+            const userLiquidity2 = (+reserve2 * +liquidityAmount) / +totalSupply;
 
             if (tokens._token1 === token1Addr) {
-                setToken1Liquidity((+reserve1 * +liquidity) / +totalSupply);
-                setToken2Liquidity((+reserve2 * +liquidity) / +totalSupply);
+                setToken1Liquidity(userLiquidity1);
+                setToken2Liquidity(userLiquidity2);
                 setToken1Supply(reserve1);
                 setToken2Supply(reserve2);
             } else {
-                setToken1Liquidity((+reserve2 * +liquidity) / +totalSupply);
-                setToken2Liquidity((+reserve1 * +liquidity) / +totalSupply);
+                setToken1Liquidity(userLiquidity2);
+                setToken2Liquidity(userLiquidity1);
                 setToken1Supply(reserve2);
                 setToken2Supply(reserve1);
             }
@@ -188,36 +149,20 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
             const poolAddr = await factory.getPoolAddress(token1Addr, token2Addr, _fee);
             const pool: Contract = await new ethers.Contract(poolAddr, poolAbi, signer);
 
-            const _liquidity: number = +(await pool.balanceOf(account));
+            const routerContract = await new ethers.Contract(routerAddress, routerAbi, signer);
 
-            if (!_liquidity) {
+            const userBal = parseInt(await pool.balanceOf(account));
+            console.log("userBal", userBal);
+            console.log("liquidity %", parseInt(liquidity));
+            const _liquidity = parseInt(liquidity) / 100;
+
+            const liquidityAmount: string = (_liquidity * userBal).toString();
+            console.log("removing", +liquidityAmount);
+
+            if (!+liquidityAmount || !userBal) {
                 alert("You don't have any liquidity");
                 return;
             }
-
-            const routerContract = await new ethers.Contract(routerAddress, routerAbi, signer);
-
-            const reserves = await pool.getReserves();
-            const tokens = await pool.getTokens();
-            const totalSupply = +ethers.utils.formatEther(await pool.totalSupply());
-
-            let reserve1: number;
-            let reserve2: number;
-
-            if (tokens._token1 === token1Addr) {
-                reserve1 = +ethers.utils.formatEther(reserves._reserve1);
-                reserve2 = +ethers.utils.formatEther(reserves._reserve2);
-            } else {
-                reserve2 = +ethers.utils.formatEther(reserves._reserve1);
-                reserve1 = +ethers.utils.formatEther(reserves._reserve2);
-            }
-
-            const _liquidityAmount =
-                ((+amount1 * totalSupply) / reserve1 + (+amount2 * totalSupply) / reserve2) / 2;
-
-            const liquidityAmount = ethers.utils.parseEther(_liquidityAmount.toString());
-
-            console.log("liquidity amount", _liquidityAmount);
 
             console.log("approving");
             let tx = await pool.approve(routerAddress, liquidityAmount);
@@ -269,12 +214,12 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
     async function updateUI() {
         await updateOptions();
         await showTokenSupply();
-        await updateAmount2();
+        // await updateAmount2();
     }
 
     useEffect(() => {
         updateUI();
-    }, [isWeb3Enabled, token1, token2, amount1, fee]);
+    }, [isWeb3Enabled, token1, token2, liquidity, fee]);
 
     return (
         <div className="pt-2">
@@ -286,28 +231,38 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
                 title={`Remove Liquidity`}
                 width="450px"
                 isCentered={true}
-                isOkDisabled={
-                    amount2 === "Why are you choosing same token kid?" || token1Liquidity === 0
-                        ? true
-                        : isOkDisabled
-                }
+                isOkDisabled={token1Liquidity === 0 ? true : isOkDisabled}
             >
-                <div className=" grid grid-cols-1 gap-3 place-content-center h-35">
+                <div className="grid grid-cols-1 gap-3 place-content-center h-35">
                     <div className="grid grid-cols-2 gap-3 place-content-stretch h-35">
-                        <Input
-                            label="Amount"
-                            name="Amount"
-                            type="text"
-                            onChange={(e) => {
-                                if (e.target.value === "" || +e.target.value <= 0) return;
-                                setTimeout(() => {
-                                    setAmount1(e.target.value);
-                                    updateAmount2();
-                                }, 1000);
-                            }}
-                            value={amount1}
-                            disabled={token1Liquidity === 0 ? true : isOkDisabled}
-                        />
+                        <div className="">
+                            <Select
+                                defaultOptionIndex={0}
+                                label="% Amount"
+                                onChange={(OptionProps) => {
+                                    setLiquidity(OptionProps.label.toString());
+                                }}
+                                disabled={isOkDisabled}
+                                options={[
+                                    {
+                                        id: "10%",
+                                        label: "10%",
+                                    },
+                                    {
+                                        id: "25%",
+                                        label: "25%",
+                                    },
+                                    {
+                                        id: "50%",
+                                        label: "50%",
+                                    },
+                                    {
+                                        id: "100%",
+                                        label: "100%",
+                                    },
+                                ]}
+                            />
+                        </div>
                         <Select
                             defaultOptionIndex={0}
                             label="Token"
@@ -317,15 +272,7 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
                             options={OptionProps}
                             disabled={isOkDisabled}
                         />
-                        <div className="pt-6">
-                            <Input
-                                label="Amount"
-                                name="Amount"
-                                type="text"
-                                disabled={token1Liquidity === 0 ? true : input2Disabled}
-                                value={amount2}
-                            />
-                        </div>
+                        <div className="pt-6"></div>
                         <div className="pt-6">
                             <Select
                                 defaultOptionIndex={2}
@@ -374,6 +321,7 @@ export default function RemoveLiquidityModal({ isVisible, onClose }: RemoveLiqui
                     <div className="pl-4">{`Your ${token2} Liquidity - ${token2Liquidity.toFixed(
                         2
                     )}`}</div>
+                    <div className="pl-4">{info}</div>
                 </div>
 
                 <div className="pb-8"></div>
