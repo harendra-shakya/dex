@@ -21,7 +21,7 @@ export default function Home(): JSX.Element {
                             <div>Loading....</div>
                         )
                     ) : (
-                        <div>Plz Connect to Rinkeby testnet</div>
+                        <div>Plz Connect to Polygon Mumbai testnet</div>
                     )}
                 </div>
             ) : (
