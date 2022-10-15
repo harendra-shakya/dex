@@ -1,70 +1,60 @@
-import { BigNumber, Contract, ContractFactory } from "ethers";
-
+import { BigNumber, Signer } from "ethers";
+import {
+    GenericERC20,
+    GenericERC20__factory,
+    Factory,
+    Factory__factory,
+    Router,
+    Router__factory,
+    Pool,
+} from "../typechain";
 import { expect, assert } from "chai";
-const { ethers, network } = require("hardhat");
+const { ethers } = require("hardhat");
 
 describe("dex tests", function () {
     const amount1 = ethers.utils.parseEther("1000");
     const amount2 = ethers.utils.parseEther("1784340");
     const smallAmount1 = ethers.utils.parseEther("10");
     const smallAmount2 = ethers.utils.parseEther("17843.4");
-    let factory: Contract,
-        wethToken: Contract,
-        user: Contract,
-        wethTokenAddress: string,
-        daiTokenAddress: string,
-        daiToken: Contract,
-        user2: Contract,
-        router: Contract,
-        pool: Contract,
-        usdcToken: Contract,
-        wbtcToken: Contract;
+    let factory: Factory,
+        router: Router,
+        pool: Pool,
+        wethToken: GenericERC20,
+        usdcToken: GenericERC20,
+        wbtcToken: GenericERC20,
+        daiToken: GenericERC20,
+        user: Signer,
+        user2: Signer;
 
     beforeEach(async function () {
         const accounts = await ethers.getSigners(2);
         user = accounts[0];
         user2 = accounts[1];
-        const chainId = network.config.chainId;
 
-        const wethTokenFactory: ContractFactory = await ethers.getContractFactory("WETH");
-        wethToken = await wethTokenFactory.deploy();
-        // prettier-ignore
-        await wethToken.deployed();
-        wethTokenAddress = wethToken.address;
-
-        const daiTokenFactory: ContractFactory = await ethers.getContractFactory("DAI");
-        daiToken = await daiTokenFactory.deploy();
-        // prettier-ignore
-        await daiToken.deployed();
-        daiTokenAddress = daiToken.address;
-
-        const usdcTokenFactory: ContractFactory = await ethers.getContractFactory("USDC");
-        usdcToken = await usdcTokenFactory.deploy();
-        // prettier-ignore
-        await usdcToken.deployed();
-
-        const wbtcTokenFactory: ContractFactory = await ethers.getContractFactory("WBTC");
-        wbtcToken = await wbtcTokenFactory.deploy();
-        // prettier-ignore
-        await wbtcToken.deployed();
-
-        const factoryContract: ContractFactory = await ethers.getContractFactory("Factory");
+        const factoryContract: Factory__factory = await ethers.getContractFactory("Factory");
         factory = await factoryContract.deploy();
-        // prettier-ignore
         await factory.deployed();
 
-        const routerContract = await ethers.getContractFactory("Router");
+        const routerContract: Router__factory = await ethers.getContractFactory("Router");
         router = await routerContract.deploy(factory.address);
-        // prettier-ignore
         await router.deployed();
+
+        const erc20Factory: GenericERC20__factory = await ethers.getContractFactory(
+            "GenericERC20"
+        );
+
+        daiToken = await erc20Factory.deploy("DAI", "DAI", "18");
+        usdcToken = await erc20Factory.deploy("USDC", "USDC", "6");
+        wbtcToken = await erc20Factory.deploy("USDT", "USDT", "8");
+        wethToken = await erc20Factory.deploy("WETH", "WETH", "18");
 
         await wethToken.approve(router.address, ethers.utils.parseEther("10000000000000"));
         await daiToken.approve(router.address, ethers.utils.parseEther("10000000000000"));
         await usdcToken.approve(router.address, ethers.utils.parseEther("10000000000000"));
-        await router.addLiquidity(wethTokenAddress, daiTokenAddress, amount1, amount2, 30);
+        await router.addLiquidity(wethToken.address, daiToken.address, amount1, amount2, 30);
         const poolAddress: string = await factory.getPoolAddress(
-            wethTokenAddress,
-            daiTokenAddress,
+            wethToken.address,
+            daiToken.address,
             30
         );
         pool = await ethers.getContractAt("Pool", poolAddress);
@@ -75,8 +65,8 @@ describe("dex tests", function () {
         it("reverts if max fee amounts exceeds", async function () {
             await expect(
                 router.addLiquidity(
-                    wethTokenAddress,
-                    daiTokenAddress,
+                    wethToken.address,
+                    daiToken.address,
                     smallAmount1,
                     smallAmount2,
                     101
@@ -85,11 +75,11 @@ describe("dex tests", function () {
         });
         it("reverts if anyone amount is zero", async function () {
             await expect(
-                router.addLiquidity(wethTokenAddress, daiTokenAddress, 0, smallAmount2, 30)
+                router.addLiquidity(wethToken.address, daiToken.address, 0, smallAmount2, 30)
             ).to.be.revertedWith("ROUTER: INVALID_AMOUNT");
 
             await expect(
-                router.addLiquidity(wethTokenAddress, daiTokenAddress, smallAmount1, 0, 30)
+                router.addLiquidity(wethToken.address, daiToken.address, smallAmount1, 0, 30)
             ).to.be.revertedWith("ROUTER: INVALID_AMOUNT");
         });
         it("calculates amount to be added", async function () {
@@ -97,8 +87,8 @@ describe("dex tests", function () {
             const beforeDaiBal: BigNumber = await daiToken.balanceOf(pool.address);
 
             await router.addLiquidity(
-                wethTokenAddress,
-                daiTokenAddress,
+                wethToken.address,
+                daiToken.address,
                 smallAmount1.add(smallAmount1), // doubling
                 smallAmount2,
                 30
@@ -111,29 +101,33 @@ describe("dex tests", function () {
         });
         it("transfer token to pool from provider", async function () {
             const beforePoolWethBal: BigNumber = await wethToken.balanceOf(pool.address);
-            const beforeProviderWethBal: BigNumber = await wethToken.balanceOf(user.address);
+            const beforeProviderWethBal: BigNumber = await wethToken.balanceOf(
+                await user.getAddress()
+            );
             await router.addLiquidity(
-                wethTokenAddress,
-                daiTokenAddress,
+                wethToken.address,
+                daiToken.address,
                 smallAmount1,
                 smallAmount2,
                 30
             );
             const afterPoolWethBal: BigNumber = await wethToken.balanceOf(pool.address);
-            const afterProviderWethBal: BigNumber = await wethToken.balanceOf(user.address);
+            const afterProviderWethBal: BigNumber = await wethToken.balanceOf(
+                await user.getAddress()
+            );
             expect(afterPoolWethBal).to.equal(smallAmount1.add(beforePoolWethBal));
             expect(beforeProviderWethBal).to.equal(smallAmount1.add(afterProviderWethBal));
         });
         it("sends liquidity tokens to provider", async function () {
-            const beforeBal: BigNumber = await pool.balanceOf(user.address);
+            const beforeBal: BigNumber = await pool.balanceOf(await user.getAddress());
             await router.addLiquidity(
-                wethTokenAddress,
-                daiTokenAddress,
+                wethToken.address,
+                daiToken.address,
                 smallAmount1,
                 smallAmount2,
                 30
             );
-            const afterBal: BigNumber = await pool.balanceOf(user.address);
+            const afterBal: BigNumber = await pool.balanceOf(await user.getAddress());
 
             assert(afterBal > beforeBal);
         });
@@ -143,8 +137,8 @@ describe("dex tests", function () {
             const beforeR2: BigNumber = reserves._reserve2;
 
             await router.addLiquidity(
-                wethTokenAddress,
-                daiTokenAddress,
+                wethToken.address,
+                daiToken.address,
                 smallAmount1,
                 smallAmount2,
                 30
@@ -161,8 +155,8 @@ describe("dex tests", function () {
         it("emits pool's Mint event", async function () {
             await expect(
                 router.addLiquidity(
-                    wethTokenAddress,
-                    daiTokenAddress,
+                    wethToken.address,
+                    daiToken.address,
                     smallAmount1,
                     smallAmount2,
                     30
@@ -173,32 +167,32 @@ describe("dex tests", function () {
     describe("remove liquidity", function () {
         it("reverts if liquidity we are sending 0 liquidity", async function () {
             await expect(
-                router.removeLiquidity(0, wethTokenAddress, daiTokenAddress, 30)
+                router.removeLiquidity(0, wethToken.address, daiToken.address, 30)
             ).to.be.revertedWith("ROUTER: Insufficient amount");
         });
         it("reverts if asking to remove liquidity from a unknown pool", async function () {
             await expect(
-                router.removeLiquidity(smallAmount1, wethTokenAddress, daiTokenAddress, 100)
+                router.removeLiquidity(smallAmount1, wethToken.address, daiToken.address, 100)
             ).to.be.revertedWith("ROUTER: Pool doesn't exist");
         });
         it("reverts if asking for more liquidity than in pool", async function () {
             await expect(
-                router.removeLiquidity(amount2, wethTokenAddress, daiTokenAddress, 30)
+                router.removeLiquidity(amount2, wethToken.address, daiToken.address, 30)
             ).to.be.revertedWith("ROUTER: Insufficient liquidity");
         });
         it("takes liquidity token from provider and burn them", async function () {
-            const liquidityBeforeBal: BigNumber = await pool.balanceOf(user.address);
-            await router.removeLiquidity(smallAmount1, wethTokenAddress, daiTokenAddress, 30);
-            const liquidityAfterBal: BigNumber = await pool.balanceOf(user.address);
+            const liquidityBeforeBal: BigNumber = await pool.balanceOf(await user.getAddress());
+            await router.removeLiquidity(smallAmount1, wethToken.address, daiToken.address, 30);
+            const liquidityAfterBal: BigNumber = await pool.balanceOf(await user.getAddress());
             expect(liquidityBeforeBal).to.equal(liquidityAfterBal.add(smallAmount1));
         });
         it("sends back assets", async function () {
-            const wethBeforeBal: BigNumber = await wethToken.balanceOf(user.address);
-            const daiBeforeBal: BigNumber = await daiToken.balanceOf(user.address);
+            const wethBeforeBal: BigNumber = await wethToken.balanceOf(await user.getAddress());
+            const daiBeforeBal: BigNumber = await daiToken.balanceOf(await user.getAddress());
 
-            await router.removeLiquidity(smallAmount1, wethTokenAddress, daiTokenAddress, 30);
-            const wethAfterBal: BigNumber = await wethToken.balanceOf(user.address);
-            const daiAfterBal: BigNumber = await daiToken.balanceOf(user.address);
+            await router.removeLiquidity(smallAmount1, wethToken.address, daiToken.address, 30);
+            const wethAfterBal: BigNumber = await wethToken.balanceOf(await user.getAddress());
+            const daiAfterBal: BigNumber = await daiToken.balanceOf(await user.getAddress());
 
             assert(wethAfterBal > wethBeforeBal);
             assert(daiAfterBal > daiBeforeBal);
@@ -215,7 +209,7 @@ describe("dex tests", function () {
             const asset1Amount: BigNumber = amount1.mul(beforeR1).div(totalSupply);
             const asset2Amount: BigNumber = amount1.mul(beforeR2).div(totalSupply);
 
-            await router.removeLiquidity(amount1, wethTokenAddress, daiTokenAddress, 30);
+            await router.removeLiquidity(amount1, wethToken.address, daiToken.address, 30);
             reserves = await pool.getReserves();
 
             const afterR1: BigNumber = reserves._reserve1;
@@ -226,7 +220,7 @@ describe("dex tests", function () {
         });
         it("emits pool's Burn event", async function () {
             await expect(
-                router.removeLiquidity(amount1, wethTokenAddress, daiTokenAddress, 30)
+                router.removeLiquidity(amount1, wethToken.address, daiToken.address, 30)
             ).to.emit(pool, "Burn");
         });
     });
@@ -234,12 +228,12 @@ describe("dex tests", function () {
         const swapAmount: BigNumber = ethers.utils.parseEther("1");
         it("reverts if path length is less than 2", async function () {
             await expect(
-                router._swap(swapAmount, [wethTokenAddress], user.address)
+                router._swap(swapAmount, [wethToken.address], await user.getAddress())
             ).to.be.revertedWith("ROUTER: INVALID_PATH");
         });
         it("swaps tokens", async function () {
-            const wethBeforeBal: BigNumber = await wethToken.balanceOf(user.address);
-            const daiBeforeBal: BigNumber = await daiToken.balanceOf(user.address);
+            const wethBeforeBal: BigNumber = await wethToken.balanceOf(await user.getAddress());
+            const daiBeforeBal: BigNumber = await daiToken.balanceOf(await user.getAddress());
 
             const reserves: {
                 _reserve1: BigNumber;
@@ -251,25 +245,35 @@ describe("dex tests", function () {
             const denominator = reserves._reserve1.mul("10000").add(amountInWithFee);
             const amountOut: BigNumber = numerator.div(denominator);
 
-            await router._swap(swapAmount, [wethTokenAddress, daiTokenAddress], user.address);
-            const wethAfterBal: BigNumber = await wethToken.balanceOf(user.address);
-            const daiAfterBal: BigNumber = await daiToken.balanceOf(user.address);
+            await router._swap(
+                swapAmount,
+                [wethToken.address, daiToken.address],
+                await user.getAddress()
+            );
+            const wethAfterBal: BigNumber = await wethToken.balanceOf(await user.getAddress());
+            const daiAfterBal: BigNumber = await daiToken.balanceOf(await user.getAddress());
 
             expect(wethBeforeBal).to.equal(wethAfterBal.add(swapAmount));
             expect(daiBeforeBal.add(amountOut)).to.equal(daiAfterBal);
         });
         it("swaps tokens even if particular pair not exists", async function () {
-            await router.addLiquidity(daiTokenAddress, usdcToken.address, amount2, amount2, 30);
+            await router.addLiquidity(
+                daiToken.address,
+                usdcToken.address,
+                amount2,
+                ethers.utils.parseUnits("1784340", 6),
+                30
+            );
 
             const poolAddress = await factory.getPoolAddress(
-                daiTokenAddress,
+                daiToken.address,
                 usdcToken.address,
                 30
             );
-            const usdcPool = await ethers.getContractAt("Pool", poolAddress);
+            const usdcPool: Pool = await ethers.getContractAt("Pool", poolAddress);
 
-            const wethBeforeBal: BigNumber = await wethToken.balanceOf(user.address);
-            const usdcBeforeBal: BigNumber = await usdcToken.balanceOf(user.address);
+            const wethBeforeBal: BigNumber = await wethToken.balanceOf(await user.getAddress());
+            const usdcBeforeBal: BigNumber = await usdcToken.balanceOf(await user.getAddress());
 
             const reserves: {
                 _reserve1: BigNumber;
@@ -293,12 +297,12 @@ describe("dex tests", function () {
 
             await router._swap(
                 swapAmount,
-                [wethTokenAddress, daiTokenAddress, usdcToken.address], // we want weth --> usdc
-                user.address
+                [wethToken.address, daiToken.address, usdcToken.address], // we want weth --> usdc
+                await user.getAddress()
             );
 
-            const wethAfterBal: BigNumber = await wethToken.balanceOf(user.address);
-            const usdcAfterBal: BigNumber = await usdcToken.balanceOf(user.address);
+            const wethAfterBal: BigNumber = await wethToken.balanceOf(await user.getAddress());
+            const usdcAfterBal: BigNumber = await usdcToken.balanceOf(await user.getAddress());
             expect(wethBeforeBal).to.equal(wethAfterBal.add(swapAmount));
             expect(usdcBeforeBal.add(amountOut)).to.equal(usdcAfterBal);
         });
@@ -316,7 +320,11 @@ describe("dex tests", function () {
             const denominator: BigNumber = reserves._reserve1.mul("10000").add(amountInWithFee);
             const amountOut: BigNumber = numerator.div(denominator);
 
-            await router._swap(swapAmount, [wethTokenAddress, daiTokenAddress], user.address);
+            await router._swap(
+                swapAmount,
+                [wethToken.address, daiToken.address],
+                await user.getAddress()
+            );
             reserves = await pool.getReserves();
 
             const afterR1: BigNumber = reserves._reserve1;
@@ -329,7 +337,11 @@ describe("dex tests", function () {
         });
         it("emits pool's Swap event", async function () {
             await expect(
-                router._swap(swapAmount, [wethTokenAddress, daiTokenAddress], user.address)
+                router._swap(
+                    swapAmount,
+                    [wethToken.address, daiToken.address],
+                    await user.getAddress()
+                )
             ).to.emit(pool, "Swap");
         });
     });
